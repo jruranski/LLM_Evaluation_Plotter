@@ -1,0 +1,14 @@
+name: rag-evaluation-plotter
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.9
+  - pip
+  - pandas
+  - numpy
+  - matplotlib
+  - seaborn
+  - tk
+  - pip:
+    - matplotlib-inline
