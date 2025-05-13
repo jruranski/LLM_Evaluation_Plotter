@@ -126,7 +126,7 @@ class RagEvaluationPlotter:
         # 3. Plot Type
         ttk.Label(frame, text="3. Select Plot Type", font=("Arial", 12, "bold")).pack(anchor="w", pady=(0,5))
         self.plot_type_var = tk.StringVar(value="Bar Plot")
-        plot_types = ["Bar Plot", "Grouped Bar Plot", "Line Plot", "Box Plot"]
+        plot_types = ["Bar Plot", "Grouped Bar Plot", "Line Plot", "Box Plot", "Per Test Case", "Per Test Case Line Plot", "Heatmap Per Model"]
         plot_type_combo = ttk.Combobox(frame, textvariable=self.plot_type_var, values=plot_types, state="readonly")
         plot_type_combo.pack(fill=tk.X, pady=(0,10))
 
@@ -289,10 +289,15 @@ class RagEvaluationPlotter:
         self.experiment_data.clear()
         self.available_metrics.clear()
         all_numeric_cols = set()
+        
+        # Store per-test case data for the "Per Test Case" plot
+        self.test_case_data = {}
 
         try:
             for exp_name, file_paths in grouped_files.items():
                 run_summaries = [] # List of pd.Series, one for each run's summary
+                test_case_values = {} # Dict to store values for each test case and metric
+                
                 for f_path in file_paths:
                     try:
                         df_run = pd.read_csv(f_path)
@@ -306,6 +311,28 @@ class RagEvaluationPlotter:
                             summary_series = df_run[numeric_cols].mean()
                             run_summaries.append(summary_series)
                             all_numeric_cols.update(summary_series.index)
+                            
+                            # Process per-test case data if "Test Case" column exists
+                            if "Test Case" in df_run.columns and any(col.endswith("Score") for col in df_run.columns):
+                                # Initialize structure for test case data if needed
+                                if exp_name not in self.test_case_data:
+                                    self.test_case_data[exp_name] = {}
+                                
+                                # Extract score columns
+                                score_cols = [col for col in df_run.columns if col.endswith("Score") and df_run[col].dtype in [np.float64, np.int64]]
+                                
+                                for score_col in score_cols:
+                                    if score_col not in self.test_case_data[exp_name]:
+                                        self.test_case_data[exp_name][score_col] = {}
+                                        
+                                    for _, row in df_run.iterrows():
+                                        if pd.notna(row["Test Case"]) and pd.notna(row[score_col]):
+                                            test_case = int(row["Test Case"]) if isinstance(row["Test Case"], (int, float)) else str(row["Test Case"])
+                                            
+                                            if test_case not in self.test_case_data[exp_name][score_col]:
+                                                self.test_case_data[exp_name][score_col][test_case] = []
+                                                
+                                            self.test_case_data[exp_name][score_col][test_case].append(float(row[score_col]))
                     except Exception as e:
                         print(f"Error reading or processing file {f_path}: {e}")
                         messagebox.showwarning("File Error", f"Could not process {os.path.basename(f_path)}:\n{e}")
@@ -418,8 +445,8 @@ class RagEvaluationPlotter:
             return
         
         plot_type = self.plot_type_var.get()
-        if plot_type == "Box Plot" and len(selected_orig_metrics) > 1:
-            messagebox.showwarning("Box Plot", "For Box Plot, typically one metric is selected for clarity. Plotting the first selected metric.")
+        if plot_type in ["Box Plot", "Per Test Case"] and len(selected_orig_metrics) > 1:
+            messagebox.showwarning(f"{plot_type}", f"For {plot_type}, typically one metric is selected for clarity. Plotting the first selected metric.")
             selected_orig_metrics = [selected_orig_metrics[0]]
         
         loading_win = self._show_loading_window("Generating plot...")
@@ -452,13 +479,17 @@ class RagEvaluationPlotter:
             self.current_plot_fig = plt.figure(figsize=(plot_width, plot_height))
             self.current_plot_fig.subplots_adjust(left=0.1, right=0.9, top=0.85, bottom=0.15)
             
-            ax = self.current_plot_fig.add_subplot(111)
+            # Only create ax for non-heatmap plots, as heatmap will create its own subplots
+            if plot_type != "Heatmap Per Model":
+                ax = self.current_plot_fig.add_subplot(111)
+            else:
+                ax = None
 
             num_exps = len(plot_exp_names)
             num_metrics = len(selected_orig_metrics)
 
             # Colors
-            color_palette_name = "colorblind" if num_metrics > 1 or plot_type=="Box Plot" else "viridis" 
+            color_palette_name = "colorblind" if num_metrics > 1 or plot_type in ["Box Plot", "Per Test Case", "Per Test Case Line Plot"] else "viridis" 
             try:
                 colors = sns.color_palette(color_palette_name, max(num_exps, num_metrics, 3))
             except:
@@ -589,36 +620,403 @@ class RagEvaluationPlotter:
                 else:
                     ax.text(0.5, 0.5, f"No data available for {display_metric} to create box plot.",
                             horizontalalignment='center', verticalalignment='center', transform=ax.transAxes)
-
-
-            # Common adjustments
-            # ax.set_xlabel("Model / Experiment")
-            if ax.get_xticklabels(): # Check if x-tick labels exist
-                ax.tick_params(axis='x', rotation=45, labelsize=9)
-                # Adjust tick label properties directly for better control with rotation
-                plt.setp(ax.get_xticklabels(), ha="right", rotation_mode="anchor")
-            
-            # Apply custom y-axis range if enabled
-            if self.custom_y_range_var.get():
-                try:
-                    y_min = float(self.y_min_entry.get()) if self.y_min_entry.get() else None
-                    y_max = float(self.y_max_entry.get()) if self.y_max_entry.get() else None
+                            
+            elif plot_type == "Per Test Case": # New plot type
+                metric = selected_orig_metrics[0]
+                display_metric = display_metric_names[0]
+                
+                if not hasattr(self, 'test_case_data') or not self.test_case_data:
+                    ax.text(0.5, 0.5, "No per-test case data available. Please ensure your files have 'Test Case' column and metric scores.",
+                            horizontalalignment='center', verticalalignment='center', transform=ax.transAxes)
+                else:
+                    # Check if any experiment has data for this metric
+                    has_data = False
+                    for exp_name in plot_exp_names:
+                        if exp_name in self.test_case_data and metric in self.test_case_data[exp_name]:
+                            has_data = True
+                            break
                     
-                    if y_min is not None and y_max is not None:
-                        if y_min >= y_max:
-                            messagebox.showwarning("Invalid Range", "Y-axis minimum must be less than maximum. Using auto-scaling.")
+                    if not has_data:
+                        ax.text(0.5, 0.5, f"No test case data available for metric '{display_metric}'.",
+                                horizontalalignment='center', verticalalignment='center', transform=ax.transAxes)
+                    else:
+                        # Find all unique test cases across all experiments
+                        all_test_cases = set()
+                        for exp_name in plot_exp_names:
+                            if exp_name in self.test_case_data and metric in self.test_case_data[exp_name]:
+                                all_test_cases.update(self.test_case_data[exp_name][metric].keys())
+                        
+                        # Sort test cases (numeric if possible)
+                        try:
+                            test_cases = sorted([int(tc) for tc in all_test_cases if str(tc).isdigit()])
+                            test_cases.extend(sorted([tc for tc in all_test_cases if not str(tc).isdigit()]))
+                        except:
+                            test_cases = sorted(all_test_cases)
+                        
+                        # Convert to strings for x-axis
+                        test_case_labels = [str(tc) for tc in test_cases]
+                        
+                        # Calculate bar positions
+                        bar_width = 0.8 / num_exps
+                        offsets = np.arange(-(num_exps-1)/2, (num_exps-1)/2 + 0.1, 1) * bar_width
+                        
+                        # Plot bars for each experiment
+                        for i, exp_name in enumerate(plot_exp_names):
+                            display_exp_name = display_exp_names[i]
+                            means = []
+                            stds = []
+                            
+                            for tc in test_cases:
+                                if (exp_name in self.test_case_data and 
+                                    metric in self.test_case_data[exp_name] and 
+                                    tc in self.test_case_data[exp_name][metric]):
+                                    
+                                    values = self.test_case_data[exp_name][metric][tc]
+                                    means.append(np.mean(values) if values else np.nan)
+                                    stds.append(np.std(values) if len(values) > 1 else 0)
+                                else:
+                                    means.append(np.nan)
+                                    stds.append(0)
+                            
+                            # Calculate x positions for bars
+                            x_positions = np.arange(len(test_case_labels)) + offsets[i]
+                            
+                            # Plot bars
+                            bars = ax.bar(x_positions, means, width=bar_width, yerr=stds, 
+                                          label=display_exp_name, color=colors[i], alpha=0.8, capsize=3)
+                        
+                        # Set x-axis labels
+                        ax.set_xticks(np.arange(len(test_case_labels)))
+                        ax.set_xticklabels(test_case_labels)
+                        ax.set_xlabel("Test Case")
+                        ax.set_ylabel(display_metric)
+                        
+                        # Add legend
+                        if num_exps > 1:
+                            ax.legend(title="Models", bbox_to_anchor=(1.05, 1), loc='upper left')
+                        
+                        # Use custom title if provided, otherwise use default
+                        title = custom_title if custom_title else f"{display_metric} per Test Case"
+                        ax.set_title(title, fontsize=14, pad=15)
+                        
+                        # Add subtitle if provided
+                        if custom_subtitle:
+                            ax.text(0.5, 0.98, custom_subtitle, transform=ax.transAxes, 
+                                   fontsize=11, ha='center', va='top', style='italic')
+
+            elif plot_type == "Per Test Case Line Plot": # New line plot for test cases
+                if not hasattr(self, 'test_case_data') or not self.test_case_data:
+                    ax.text(0.5, 0.5, "No per-test case data available. Please ensure your files have 'Test Case' column and metric scores.",
+                            horizontalalignment='center', verticalalignment='center', transform=ax.transAxes)
+                else:
+                    # Find all unique test cases across all experiments and metrics
+                    all_test_cases = set()
+                    has_data = False
+                    
+                    for exp_name in plot_exp_names:
+                        if exp_name in self.test_case_data:
+                            for metric in selected_orig_metrics:
+                                if metric in self.test_case_data[exp_name]:
+                                    all_test_cases.update(self.test_case_data[exp_name][metric].keys())
+                                    has_data = True
+                    
+                    if not has_data:
+                        ax.text(0.5, 0.5, "No test case data available for the selected metrics.",
+                                horizontalalignment='center', verticalalignment='center', transform=ax.transAxes)
+                    else:
+                        # Sort test cases (numeric if possible)
+                        try:
+                            test_cases = sorted([int(tc) for tc in all_test_cases if str(tc).isdigit()])
+                            test_cases.extend(sorted([tc for tc in all_test_cases if not str(tc).isdigit()]))
+                        except:
+                            test_cases = sorted(all_test_cases)
+                        
+                        # Convert to strings for x-axis
+                        test_case_labels = [str(tc) for tc in test_cases]
+                        
+                        # Define marker styles for different models
+                        markers = ['o', 's', '^', 'D', 'v', 'p', '*', 'h', 'X', 'P']
+                        if num_exps > len(markers):
+                            # Repeat markers if needed
+                            markers = markers * (num_exps // len(markers) + 1)
+                        
+                        # Create line plots for each model-metric combination
+                        for i, exp_name in enumerate(plot_exp_names):
+                            display_exp_name = display_exp_names[i]
+                            
+                            for j, metric in enumerate(selected_orig_metrics):
+                                display_metric = display_metric_names[j]
+                                
+                                if (exp_name in self.test_case_data and 
+                                    metric in self.test_case_data[exp_name]):
+                                    
+                                    means = []
+                                    stds = []
+                                    
+                                    for tc in test_cases:
+                                        if tc in self.test_case_data[exp_name][metric]:
+                                            values = self.test_case_data[exp_name][metric][tc]
+                                            means.append(np.mean(values) if values else np.nan)
+                                            stds.append(np.std(values) if len(values) > 1 else 0)
+                                        else:
+                                            means.append(np.nan)
+                                            stds.append(0)
+                                    
+                                    # Get x positions
+                                    x_positions = np.arange(len(test_case_labels))
+                                    
+                                    # Remove NaN values for plotting
+                                    valid_indices = ~np.isnan(means)
+                                    if not any(valid_indices):
+                                        continue  # Skip if no valid data
+                                    
+                                    x_valid = x_positions[valid_indices]
+                                    y_valid = np.array(means)[valid_indices]
+                                    yerr_valid = np.array(stds)[valid_indices]
+                                    
+                                    # Create label that includes both model and metric
+                                    if num_metrics > 1:
+                                        label = f"{display_exp_name} - {display_metric}"
+                                    else:
+                                        label = display_exp_name
+                                    
+                                    # Plot with different marker for each model
+                                    line = ax.errorbar(
+                                        x_valid, y_valid, yerr=yerr_valid,
+                                        label=label,
+                                        marker=markers[i % len(markers)],
+                                        markersize=8,
+                                        color=colors[j % len(colors)] if num_metrics > 1 else colors[i % len(colors)],
+                                        linestyle='-' if num_metrics == 1 else ['-', '--', ':', '-.'][j % 4],
+                                        capsize=3
+                                    )
+                        
+                        # Set x-axis labels
+                        ax.set_xticks(np.arange(len(test_case_labels)))
+                        ax.set_xticklabels(test_case_labels)
+                        ax.set_xlabel("Test Case")
+                        
+                        if num_metrics == 1:
+                            ax.set_ylabel(display_metric_names[0])
                         else:
-                            ax.set_ylim(y_min, y_max)
-                    elif y_min is not None:
-                        ax.set_ylim(bottom=y_min)
-                    elif y_max is not None:
-                        ax.set_ylim(top=y_max)
-                except ValueError:
-                    # If conversion fails, just use auto-scaling
-                    pass
-            
-            # Add more space for rotated labels
-            self.current_plot_fig.tight_layout(pad=2.0, rect=[0, 0, 1, 0.95])
+                            ax.set_ylabel("Score Value")
+                        
+                        # Add legend (with more space if many items)
+                        if (num_exps > 1 or num_metrics > 1):
+                            legend_items = num_exps * (1 if num_metrics == 1 else num_metrics)
+                            if legend_items > 6:
+                                # Two-column legend for many items
+                                ax.legend(bbox_to_anchor=(1.05, 1), loc='upper left', ncol=2)
+                            else:
+                                ax.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
+                        
+                        # Use custom title if provided, otherwise use default
+                        if num_metrics == 1:
+                            title = custom_title if custom_title else f"{display_metric_names[0]} per Test Case"
+                        else:
+                            title = custom_title if custom_title else "Metrics per Test Case"
+                            
+                        ax.set_title(title, fontsize=14, pad=15)
+                        
+                        # Add subtitle if provided
+                        if custom_subtitle:
+                            ax.text(0.5, 0.98, custom_subtitle, transform=ax.transAxes, 
+                                   fontsize=11, ha='center', va='top', style='italic')
+                        
+                        # Make sure all test cases are visible
+                        if len(test_case_labels) > 10:
+                            # For many test cases, show fewer labels
+                            step = max(1, len(test_case_labels) // 10)
+                            visible_ticks = np.arange(0, len(test_case_labels), step)
+                            ax.set_xticks(visible_ticks)
+                            ax.set_xticklabels([test_case_labels[i] for i in visible_ticks])
+
+            elif plot_type == "Heatmap Per Model":
+                if not hasattr(self, 'test_case_data') or not self.test_case_data:
+                    # Create a single subplot for the error message
+                    ax = self.current_plot_fig.add_subplot(111)
+                    ax.text(0.5, 0.5, "No per-test case data available. Please ensure your files have 'Test Case' column and metric scores.",
+                            horizontalalignment='center', verticalalignment='center', transform=ax.transAxes)
+                    ax.axis('off')  # Hide axes
+                else:
+                    # Check if any experiment has data for the selected metrics
+                    valid_models = []
+                    for exp_name in plot_exp_names:
+                        if exp_name in self.test_case_data:
+                            has_metrics = False
+                            for metric in selected_orig_metrics:
+                                if metric in self.test_case_data[exp_name] and self.test_case_data[exp_name][metric]:
+                                    has_metrics = True
+                                    break
+                            if has_metrics:
+                                valid_models.append(exp_name)
+                    
+                    if not valid_models:
+                        # Create a single subplot for the error message
+                        ax = self.current_plot_fig.add_subplot(111)
+                        ax.text(0.5, 0.5, "No test case data available for the selected metrics.",
+                                horizontalalignment='center', verticalalignment='center', transform=ax.transAxes)
+                        ax.axis('off')  # Hide axes
+                    else:
+                        # Find all unique test cases across all experiments and metrics
+                        all_test_cases = set()
+                        for exp_name in valid_models:
+                            for metric in selected_orig_metrics:
+                                if metric in self.test_case_data[exp_name]:
+                                    all_test_cases.update(self.test_case_data[exp_name][metric].keys())
+                        
+                        # Sort test cases (numeric if possible)
+                        try:
+                            test_cases = sorted([int(tc) for tc in all_test_cases if str(tc).isdigit()])
+                            test_cases.extend(sorted([tc for tc in all_test_cases if not str(tc).isdigit()]))
+                        except:
+                            test_cases = sorted(all_test_cases)
+                        
+                        # Convert to strings for axis labels
+                        test_case_labels = [str(tc) for tc in test_cases]
+                        
+                        # Determine grid layout based on number of models
+                        n_models = len(valid_models)
+                        if n_models == 1:
+                            n_rows, n_cols = 1, 1
+                        elif n_models == 2:
+                            n_rows, n_cols = 1, 2
+                        elif n_models <= 4:
+                            n_rows, n_cols = 2, 2
+                        elif n_models <= 6:
+                            n_rows, n_cols = 2, 3
+                        elif n_models <= 9:
+                            n_rows, n_cols = 3, 3
+                        else:
+                            # For more models, use a more rectangular layout
+                            n_cols = min(4, n_models)
+                            n_rows = (n_models + n_cols - 1) // n_cols  # Ceiling division
+                        
+                        # Create a tight layout to maximize heatmap size
+                        self.current_plot_fig.subplots_adjust(left=0.1, right=0.9, top=0.9, bottom=0.1, wspace=0.3, hspace=0.4)
+                        
+                        # Create a standardized color scale across all heatmaps
+                        vmin, vmax = 0, 1
+                        for exp_name in valid_models:
+                            for metric in selected_orig_metrics:
+                                if metric in self.test_case_data[exp_name]:
+                                    for tc in self.test_case_data[exp_name][metric]:
+                                        values = self.test_case_data[exp_name][metric][tc]
+                                        if values:
+                                            mean_val = np.mean(values)
+                                            if pd.notna(mean_val):
+                                                vmin = min(vmin, mean_val)
+                                                vmax = max(vmax, mean_val)
+                        
+                        # Add a bit of padding to the range
+                        vmin = max(0, vmin - 0.05)
+                        vmax = min(1, vmax + 0.05)
+                        
+                        # Use a sequential colormap
+                        cmap = sns.color_palette("rocket", as_cmap=True)
+                        
+                        # Create heatmaps for each model
+                        for i, exp_name in enumerate(valid_models):
+                            display_exp_name = display_exp_names[plot_exp_names.index(exp_name)]
+                            
+                            # Create the subplot
+                            ax = self.current_plot_fig.add_subplot(n_rows, n_cols, i+1)
+                            
+                            # Prepare data for the heatmap
+                            heatmap_data = np.zeros((len(selected_orig_metrics), len(test_cases)))
+                            heatmap_data.fill(np.nan)  # Fill with NaN for missing values
+                            
+                            # Fill in the data
+                            for j, metric in enumerate(selected_orig_metrics):
+                                if metric in self.test_case_data[exp_name]:
+                                    for k, tc in enumerate(test_cases):
+                                        if tc in self.test_case_data[exp_name][metric]:
+                                            values = self.test_case_data[exp_name][metric][tc]
+                                            if values:
+                                                heatmap_data[j, k] = np.mean(values)
+                            
+                            # Create the heatmap
+                            sns.heatmap(
+                                heatmap_data,
+                                ax=ax,
+                                cmap=cmap,
+                                vmin=vmin,
+                                vmax=vmax,
+                                annot=True,  # Show values in cells
+                                fmt=".2f",  # Format for annotations
+                                linewidths=0.5,
+                                cbar=True,
+                                cbar_kws={"shrink": 0.8}
+                            )
+                            
+                            # Set title and labels
+                            ax.set_title(display_exp_name, fontsize=11)
+                            ax.set_xlabel("Test Case", fontsize=9)
+                            ax.set_ylabel("Metric", fontsize=9)
+                            
+                            # Set y-axis labels to metric names
+                            ax.set_yticklabels(display_metric_names, rotation=0, fontsize=8)
+                            
+                            # Set x-axis labels to test case numbers
+                            # If there are many test cases, show fewer labels
+                            if len(test_case_labels) > 10:
+                                step = max(1, len(test_case_labels) // 10)
+                                visible_tick_indices = list(range(0, len(test_case_labels), step))
+                                visible_ticks = [test_case_labels[i] for i in visible_tick_indices]
+                                
+                                # Create new tick positions and labels
+                                ax.set_xticks([i * step for i in range(len(visible_ticks))])
+                                ax.set_xticklabels(visible_ticks, rotation=45, fontsize=8)
+                            else:
+                                ax.set_xticklabels(test_case_labels, rotation=45, fontsize=8)
+                        
+                        # Add an overall title if provided
+                        if custom_title:
+                            self.current_plot_fig.suptitle(custom_title, fontsize=14, y=0.98)
+                        else:
+                            self.current_plot_fig.suptitle("Performance Heatmap by Model", fontsize=14, y=0.98)
+                        
+                        # Add subtitle if provided
+                        if custom_subtitle:
+                            self.current_plot_fig.text(0.5, 0.94, custom_subtitle, 
+                                                 ha='center', va='top', fontsize=11, style='italic')
+                        
+                        # Adjust figure layout to make room for all subplots
+                        # Removed tight_layout call to avoid colorbar conflicts
+                
+                # Skip common adjustments at the end as we've handled them here
+                common_adjustments_needed = False
+            else:
+                common_adjustments_needed = True
+                
+            # Common adjustments (only for non-heatmap plots)
+            if plot_type != "Heatmap Per Model":
+                if ax.get_xticklabels(): # Check if x-tick labels exist
+                    ax.tick_params(axis='x', rotation=45, labelsize=9)
+                    # Adjust tick label properties directly for better control with rotation
+                    plt.setp(ax.get_xticklabels(), ha="right", rotation_mode="anchor")
+                
+                # Apply custom y-axis range if enabled
+                if self.custom_y_range_var.get():
+                    try:
+                        y_min = float(self.y_min_entry.get()) if self.y_min_entry.get() else None
+                        y_max = float(self.y_max_entry.get()) if self.y_max_entry.get() else None
+                        
+                        if y_min is not None and y_max is not None:
+                            if y_min >= y_max:
+                                messagebox.showwarning("Invalid Range", "Y-axis minimum must be less than maximum. Using auto-scaling.")
+                            else:
+                                ax.set_ylim(y_min, y_max)
+                        elif y_min is not None:
+                            ax.set_ylim(bottom=y_min)
+                        elif y_max is not None:
+                            ax.set_ylim(top=y_max)
+                    except ValueError:
+                        # If conversion fails, just use auto-scaling
+                        pass
+                
+                # Add more space for rotated labels
+                self.current_plot_fig.tight_layout(pad=2.0, rect=[0, 0, 1, 0.95])
 
             # Create a new canvas if none exists, or update the existing one
             if self.plot_canvas is None:
