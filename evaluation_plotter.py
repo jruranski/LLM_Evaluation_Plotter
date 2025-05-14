@@ -126,7 +126,8 @@ class RagEvaluationPlotter:
         # 3. Plot Type
         ttk.Label(frame, text="3. Select Plot Type", font=("Arial", 12, "bold")).pack(anchor="w", pady=(0,5))
         self.plot_type_var = tk.StringVar(value="Bar Plot")
-        plot_types = ["Bar Plot", "Grouped Bar Plot", "Line Plot", "Box Plot", "Per Test Case", "Per Test Case Line Plot", "Heatmap Per Model"]
+        plot_types = ["Bar Plot", "Grouped Bar Plot", "Line Plot", "Box Plot", "Per Test Case", "Per Test Case Line Plot", "Heatmap Per Model", 
+                     "Correlation Matrix", "Radar Chart", "Violin Plot", "Statistical Significance"]
         plot_type_combo = ttk.Combobox(frame, textvariable=self.plot_type_var, values=plot_types, state="readonly")
         plot_type_combo.pack(fill=tk.X, pady=(0,10))
 
@@ -475,9 +476,17 @@ class RagEvaluationPlotter:
             custom_title = self.title_entry.get().strip()
             custom_subtitle = self.subtitle_entry.get().strip()
             
-            # Create new figure with specified size
-            self.current_plot_fig = plt.figure(figsize=(plot_width, plot_height))
-            self.current_plot_fig.subplots_adjust(left=0.1, right=0.9, top=0.85, bottom=0.15)
+            # Check if the plot type uses colorbars to determine the appropriate layout engine
+            colorbar_plots = ["Heatmap Per Model", "Correlation Matrix", "Violin Plot", "Radar Chart", "Statistical Significance"]
+            use_constrained_layout = plot_type not in colorbar_plots
+            
+            # Create new figure with specified size and appropriate layout settings
+            self.current_plot_fig = plt.figure(figsize=(plot_width, plot_height), 
+                                              constrained_layout=use_constrained_layout)
+            
+            # Only set manual adjustments if not using constrained layout
+            if not use_constrained_layout:
+                self.current_plot_fig.subplots_adjust(left=0.1, right=0.9, top=0.85, bottom=0.15)
             
             # Only create ax for non-heatmap plots, as heatmap will create its own subplots
             if plot_type != "Heatmap Per Model":
@@ -885,8 +894,6 @@ class RagEvaluationPlotter:
                             n_rows, n_cols = 2, 2
                         elif n_models <= 6:
                             n_rows, n_cols = 2, 3
-                        elif n_models <= 9:
-                            n_rows, n_cols = 3, 3
                         else:
                             # For more models, use a more rectangular layout
                             n_cols = min(4, n_models)
@@ -986,9 +993,444 @@ class RagEvaluationPlotter:
                 
                 # Skip common adjustments at the end as we've handled them here
                 common_adjustments_needed = False
-            else:
-                common_adjustments_needed = True
+            elif plot_type == "Correlation Matrix":
+                # Require at least 2 metrics for correlation
+                if len(selected_orig_metrics) < 2:
+                    ax.text(0.5, 0.5, "Please select at least two metrics for correlation analysis.",
+                            horizontalalignment='center', verticalalignment='center', transform=ax.transAxes)
+                    ax.axis('off')
+                else:
+                    # Create a DataFrame with all metrics data for each experiment
+                    corr_data_by_exp = {}
+                    
+                    for exp_name in plot_exp_names:
+                        # Get metric values for this experiment
+                        metric_values = {}
+                        
+                        # Check if we have test case data available
+                        if hasattr(self, 'test_case_data') and self.test_case_data and exp_name in self.test_case_data:
+                            # Collect all metric values across test cases
+                            for metric in selected_orig_metrics:
+                                if metric in self.test_case_data[exp_name]:
+                                    all_values = []
+                                    for tc, values in self.test_case_data[exp_name][metric].items():
+                                        all_values.extend(values)
+                                    
+                                    if all_values:
+                                        metric_values[metric] = all_values
+                        
+                        # If we don't have test case data or it's incomplete, use mean values
+                        missing_metrics = [m for m in selected_orig_metrics if m not in metric_values]
+                        if missing_metrics:
+                            for metric in missing_metrics:
+                                if metric in self.experiment_data[exp_name]['mean']:
+                                    # Just use the mean as a single value
+                                    metric_values[metric] = [self.experiment_data[exp_name]['mean'][metric]]
+                        
+                        # Only include experiments with values for all selected metrics
+                        if all(metric in metric_values for metric in selected_orig_metrics):
+                            # Make sure all metrics have the same number of values
+                            max_length = max(len(values) for values in metric_values.values())
+                            for metric, values in metric_values.items():
+                                if len(values) < max_length:
+                                    # Repeat the value to match the max length
+                                    metric_values[metric] = values * (max_length // len(values) + 1)
+                                    metric_values[metric] = metric_values[metric][:max_length]
+                            
+                            # Create dataframe with metrics as columns
+                            df = pd.DataFrame({display_metric_names[selected_orig_metrics.index(metric)]: values 
+                                              for metric, values in metric_values.items()})
+                            corr_data_by_exp[display_exp_names[plot_exp_names.index(exp_name)]] = df
+                    
+                    if not corr_data_by_exp:
+                        ax.text(0.5, 0.5, "No complete data available for correlation analysis.",
+                                horizontalalignment='center', verticalalignment='center', transform=ax.transAxes)
+                        ax.axis('off')
+                    else:
+                        # Determine layout based on number of experiments
+                        n_exps = len(corr_data_by_exp)
+                        if n_exps == 1:
+                            n_rows, n_cols = 1, 1
+                        elif n_exps == 2:
+                            n_rows, n_cols = 1, 2
+                        elif n_exps <= 4:
+                            n_rows, n_cols = 2, 2
+                        elif n_exps <= 6:
+                            n_rows, n_cols = 2, 3
+                        else:
+                            n_rows, n_cols = (n_exps + 2) // 3, 3
+                        
+                        # Clear the existing axis to make room for subplots
+                        self.current_plot_fig.clear()
+                        
+                        # Disable constrained_layout to avoid colorbar conflicts
+                        self.current_plot_fig.set_constrained_layout(False)
+                        
+                        # Set manual subplots adjustment
+                        self.current_plot_fig.subplots_adjust(left=0.1, right=0.9, top=0.9, bottom=0.1, wspace=0.3, hspace=0.4)
+                        
+                        # Add overall title
+                        if custom_title:
+                            self.current_plot_fig.suptitle(custom_title, fontsize=14, y=0.98)
+                        else:
+                            self.current_plot_fig.suptitle("Correlation Matrix between Metrics", fontsize=14, y=0.98)
+                        
+                        # Add subtitle if provided
+                        if custom_subtitle:
+                            self.current_plot_fig.text(0.5, 0.94, custom_subtitle, 
+                                                 ha='center', va='top', fontsize=11, style='italic')
+                        
+                        # Create correlation heatmaps for each experiment
+                        for i, (exp_name, df) in enumerate(corr_data_by_exp.items()):
+                            # Calculate correlation matrix
+                            corr_matrix = df.corr()
+                            
+                            # Create subplot
+                            ax = self.current_plot_fig.add_subplot(n_rows, n_cols, i+1)
+                            
+                            # Create heatmap
+                            mask = np.triu(np.ones_like(corr_matrix, dtype=bool))  # Mask for upper triangle
+                            cmap = sns.diverging_palette(230, 20, as_cmap=True)  # Red-blue color palette
+                            
+                            sns.heatmap(corr_matrix, mask=mask, cmap=cmap, vmin=-1, vmax=1, center=0,
+                                       square=True, linewidths=.5, cbar_kws={"shrink": .8}, annot=True,
+                                       fmt=".2f", ax=ax)
+                            
+                            # Set title
+                            ax.set_title(exp_name, fontsize=11)
+                        
+                        # We've handled the layout ourselves
+                        common_adjustments_needed = False
+            
+            elif plot_type == "Radar Chart":
+                # Need at least 3 metrics for a meaningful radar chart
+                if len(selected_orig_metrics) < 3:
+                    ax.text(0.5, 0.5, "Please select at least three metrics for radar chart.",
+                            horizontalalignment='center', verticalalignment='center', transform=ax.transAxes)
+                    ax.axis('off')
+                else:
+                    # Clear the existing axis
+                    self.current_plot_fig.clear()
+                    
+                    # Add overall title
+                    if custom_title:
+                        self.current_plot_fig.suptitle(custom_title, fontsize=14, y=0.98)
+                    else:
+                        self.current_plot_fig.suptitle("Radar Chart of Metrics by Model", fontsize=14, y=0.98)
+                    
+                    # Add subtitle if provided
+                    if custom_subtitle:
+                        self.current_plot_fig.text(0.5, 0.94, custom_subtitle, 
+                                             ha='center', va='top', fontsize=11, style='italic')
+                    
+                    # Create the radar chart
+                    ax = self.current_plot_fig.add_subplot(111, polar=True)
+                    
+                    # Set number of angles (metrics)
+                    angles = np.linspace(0, 2*np.pi, len(selected_orig_metrics), endpoint=False).tolist()
+                    
+                    # Close the polygon
+                    angles += angles[:1]
+                    
+                    # Set labels
+                    ax.set_xticks(angles[:-1])
+                    ax.set_xticklabels(display_metric_names)
+                    
+                    # Draw axis lines for each angle and label
+                    ax.set_theta_offset(np.pi / 2)
+                    ax.set_theta_direction(-1)
+                    
+                    # Draw the y-tick labels (no explicit ranges, automatically scaled)
+                    ax.set_rlabel_position(0)
+                    
+                    # Plot each experiment
+                    for i, exp_name in enumerate(plot_exp_names):
+                        display_exp_name = display_exp_names[i]
+                        
+                        # Get values for each metric
+                        values = []
+                        for metric in selected_orig_metrics:
+                            if metric in self.experiment_data[exp_name]['mean']:
+                                values.append(self.experiment_data[exp_name]['mean'][metric])
+                            else:
+                                # Use 0 if metric not available
+                                values.append(0)
+                        
+                        # Close the polygon by appending the first value
+                        values += values[:1]
+                        
+                        # Plot values
+                        ax.plot(angles, values, linewidth=1, linestyle='solid', label=display_exp_name, color=colors[i])
+                        ax.fill(angles, values, alpha=0.1, color=colors[i])
+                    
+                    # Add legend
+                    ax.legend(loc='upper right', bbox_to_anchor=(0.1, 0.1))
+                    
+                    # We've handled the layout ourselves
+                    common_adjustments_needed = False
+                    
+            elif plot_type == "Violin Plot":
+                # Similar to box plot but with distribution visualization
+                metric = selected_orig_metrics[0]
+                display_metric = display_metric_names[0]
                 
+                # We need individual values, not just mean/std
+                if not hasattr(self, 'test_case_data') or not self.test_case_data:
+                    # Try to use boxplot data if test case data not available
+                    data_to_plot = [self.experiment_data[exp]['all_values'].get(metric, []) for exp in plot_exp_names]
+                    
+                    # Filter out experiments with no data for this metric
+                    valid_data_indices = [i for i, d in enumerate(data_to_plot) if d]
+                    filtered_data = [data_to_plot[i] for i in valid_data_indices]
+                    filtered_labels = [display_exp_names[i] for i in valid_data_indices]
+                    
+                    if not filtered_data or all(len(d) == 0 for d in filtered_data):
+                        ax.text(0.5, 0.5, "No distribution data available for violin plot. Please ensure you have test case data.",
+                                horizontalalignment='center', verticalalignment='center', transform=ax.transAxes)
+                    else:
+                        # Create a DataFrame for seaborn
+                        all_values = []
+                        all_models = []
+                        
+                        for i, values in enumerate(filtered_data):
+                            all_values.extend(values)
+                            all_models.extend([filtered_labels[i]] * len(values))
+                        
+                        df = pd.DataFrame({
+                            'Model': all_models,
+                            'Value': all_values
+                        })
+                        
+                        # Clear existing axes and create seaborn plot
+                        self.current_plot_fig.clear()
+                        ax = self.current_plot_fig.add_subplot(111)
+                        
+                        # Create the violin plot
+                        sns.violinplot(x='Model', y='Value', data=df, 
+                                     palette=colors[:len(filtered_labels)],
+                                     inner='quartile', # Show quartiles inside
+                                     ax=ax)
+                        
+                        # Add individual observations as points
+                        sns.stripplot(x='Model', y='Value', data=df, 
+                                    size=4, color='.3', alpha=0.7,
+                                    ax=ax)
+                        
+                        # Add labels
+                        ax.set_ylabel(display_metric)
+                        if custom_title:
+                            ax.set_title(custom_title, fontsize=14, pad=15)
+                        else:
+                            ax.set_title(f"Distribution of {display_metric}", fontsize=14, pad=15)
+                        
+                        # Add subtitle if provided
+                        if custom_subtitle:
+                            ax.text(0.5, 0.98, custom_subtitle, transform=ax.transAxes, 
+                                   fontsize=11, ha='center', va='top', style='italic')
+                else:
+                    # Use test case data for more detailed violin plots
+                    all_values = []
+                    all_models = []
+                    
+                    for i, exp_name in enumerate(plot_exp_names):
+                        display_exp_name = display_exp_names[i]
+                        
+                        if exp_name in self.test_case_data and metric in self.test_case_data[exp_name]:
+                            # Collect all values across test cases
+                            exp_values = []
+                            for tc, values in self.test_case_data[exp_name][metric].items():
+                                exp_values.extend(values)
+                            
+                            if exp_values:
+                                all_values.extend(exp_values)
+                                all_models.extend([display_exp_name] * len(exp_values))
+                    
+                    if not all_values:
+                        ax.text(0.5, 0.5, f"No test case data available for metric '{display_metric}'.",
+                                horizontalalignment='center', verticalalignment='center', transform=ax.transAxes)
+                    else:
+                        # Create a DataFrame for seaborn
+                        df = pd.DataFrame({
+                            'Model': all_models,
+                            'Value': all_values
+                        })
+                        
+                        # Clear existing axes and create seaborn plot
+                        self.current_plot_fig.clear()
+                        ax = self.current_plot_fig.add_subplot(111)
+                        
+                        # Create the violin plot
+                        sns.violinplot(x='Model', y='Value', data=df, 
+                                     palette=colors[:len(plot_exp_names)],
+                                     inner='quartile', # Show quartiles inside
+                                     ax=ax)
+                        
+                        # Add individual observations as points
+                        sns.stripplot(x='Model', y='Value', data=df, 
+                                    size=4, color='.3', alpha=0.7,
+                                    ax=ax)
+                        
+                        # Add labels
+                        ax.set_ylabel(display_metric)
+                        if custom_title:
+                            ax.set_title(custom_title, fontsize=14, pad=15)
+                        else:
+                            ax.set_title(f"Distribution of {display_metric}", fontsize=14, pad=15)
+                        
+                        # Add subtitle if provided
+                        if custom_subtitle:
+                            ax.text(0.5, 0.98, custom_subtitle, transform=ax.transAxes, 
+                                   fontsize=11, ha='center', va='top', style='italic')
+            
+            elif plot_type == "Statistical Significance":
+                if len(selected_orig_metrics) != 1:
+                    ax.text(0.5, 0.5, "Please select exactly one metric for statistical significance visualization.",
+                            horizontalalignment='center', verticalalignment='center', transform=ax.transAxes)
+                    ax.axis('off')
+                elif len(plot_exp_names) < 2:
+                    ax.text(0.5, 0.5, "Please include at least two models for comparison.",
+                            horizontalalignment='center', verticalalignment='center', transform=ax.transAxes)
+                    ax.axis('off')
+                else:
+                    metric = selected_orig_metrics[0]
+                    display_metric = display_metric_names[0]
+                    
+                    # Get model values for this metric
+                    model_values = []
+                    
+                    for exp_name in plot_exp_names:
+                        if hasattr(self, 'test_case_data') and self.test_case_data and exp_name in self.test_case_data and metric in self.test_case_data[exp_name]:
+                            # Get all values across test cases
+                            values = []
+                            for tc, vals in self.test_case_data[exp_name][metric].items():
+                                values.extend(vals)
+                            
+                            if values:
+                                model_values.append(values)
+                            else:
+                                # If no test case values, try to use mean
+                                if metric in self.experiment_data[exp_name]['mean']:
+                                    model_values.append([self.experiment_data[exp_name]['mean'][metric]])
+                                else:
+                                    model_values.append([])
+                        else:
+                            # Try to use mean if available
+                            if metric in self.experiment_data[exp_name]['mean']:
+                                model_values.append([self.experiment_data[exp_name]['mean'][metric]])
+                            else:
+                                model_values.append([])
+                    
+                    # Remove empty models
+                    valid_indices = [i for i, values in enumerate(model_values) if values]
+                    if not valid_indices:
+                        ax.text(0.5, 0.5, f"No data available for metric '{display_metric}'.",
+                                horizontalalignment='center', verticalalignment='center', transform=ax.transAxes)
+                    else:
+                        # Filter to valid models only
+                        filtered_values = [model_values[i] for i in valid_indices]
+                        filtered_names = [display_exp_names[i] for i in valid_indices]
+                        
+                        # Calculate means and confidence intervals
+                        means = [np.mean(values) for values in filtered_values]
+                        
+                        # Calculate 95% confidence intervals
+                        confidence_intervals = []
+                        for values in filtered_values:
+                            if len(values) > 1:
+                                # Calculate standard error
+                                stderr = np.std(values, ddof=1) / np.sqrt(len(values))
+                                # 95% confidence interval (approximately 1.96 standard errors)
+                                ci = 1.96 * stderr
+                                confidence_intervals.append(ci)
+                            else:
+                                # Can't calculate CI with one value
+                                confidence_intervals.append(0)
+                        
+                        # Clear existing axes
+                        self.current_plot_fig.clear()
+                        ax = self.current_plot_fig.add_subplot(111)
+                        
+                        # Plot bar chart with error bars
+                        bars = ax.bar(filtered_names, means, yerr=confidence_intervals, 
+                                     capsize=10, color=colors[:len(filtered_names)], alpha=0.7)
+                        
+                        # Add pairwise significance markers
+                        if len(filtered_values) > 1:
+                            # Calculate all pairwise p-values
+                            p_values = np.zeros((len(filtered_values), len(filtered_values)))
+                            
+                            for i in range(len(filtered_values)):
+                                for j in range(i+1, len(filtered_values)):
+                                    # Skip if either has only one value
+                                    if len(filtered_values[i]) <= 1 or len(filtered_values[j]) <= 1:
+                                        p_values[i, j] = 1.0  # Not significant
+                                        continue
+                                    
+                                    # Perform t-test for independent samples
+                                    from scipy import stats
+                                    _, p_value = stats.ttest_ind(filtered_values[i], filtered_values[j], 
+                                                               equal_var=False)  # Welch's t-test
+                                    p_values[i, j] = p_value
+                                    p_values[j, i] = p_value  # Symmetric
+                            
+                            # Add significance markers
+                            bar_width = bars[0].get_width()
+                            bar_centers = [bar.get_x() + bar_width/2 for bar in bars]
+                            y_max = max(means) + max(confidence_intervals) * 1.2
+                            
+                            significance_levels = [0.05, 0.01, 0.001]
+                            significance_markers = ['*', '**', '***']
+                            
+                            # Add a legend for significance
+                            ax.text(0.02, 0.98, '* p<0.05  ** p<0.01  *** p<0.001', 
+                                   transform=ax.transAxes, fontsize=10, ha='left', va='top')
+                            
+                            for i in range(len(filtered_values)):
+                                for j in range(i+1, len(filtered_values)):
+                                    p = p_values[i, j]
+                                    
+                                    # Determine significance level
+                                    marker = ''
+                                    for k, level in enumerate(significance_levels):
+                                        if p < level:
+                                            marker = significance_markers[k]
+                                    
+                                    if marker:  # If significant
+                                        # Draw a line connecting the bars
+                                        height = y_max + 0.05 * (j - i)
+                                        line_height = [height, height]
+                                        line_x = [bar_centers[i], bar_centers[j]]
+                                        
+                                        ax.plot(line_x, line_height, '-k', linewidth=0.75)
+                                        
+                                        # Add the significance marker
+                                        ax.text((bar_centers[i] + bar_centers[j]) / 2, height,
+                                              marker, ha='center', va='bottom', fontsize=12)
+                        
+                        # Add labels and title
+                        ax.set_ylabel(display_metric)
+                        if custom_title:
+                            ax.set_title(custom_title, fontsize=14, pad=15)
+                        else:
+                            ax.set_title(f"Statistical Comparison of {display_metric}", fontsize=14, pad=15)
+                        
+                        # Add subtitle if provided
+                        if custom_subtitle:
+                            ax.text(0.5, 0.98, custom_subtitle, transform=ax.transAxes, 
+                                   fontsize=11, ha='center', va='top', style='italic')
+                        
+                        # Adjust y-axis to include significance markers
+                        if len(filtered_values) > 1:
+                            ax.set_ylim(top=y_max * 1.2)
+                        
+                        # Add means as text on bars
+                        for i, bar in enumerate(bars):
+                            height = means[i]
+                            ci = confidence_intervals[i]
+                            ax.text(bar.get_x() + bar.get_width()/2, height + (ci if ci > 0 else 0) + 0.01,
+                                  f'{height:.3f}' + (f'\n±{ci:.3f}' if ci > 0 else ''),
+                                  ha='center', va='bottom', fontsize=9, linespacing=0.9)
+
             # Common adjustments (only for non-heatmap plots)
             if plot_type != "Heatmap Per Model":
                 if ax.get_xticklabels(): # Check if x-tick labels exist
@@ -1016,7 +1458,14 @@ class RagEvaluationPlotter:
                         pass
                 
                 # Add more space for rotated labels
-                self.current_plot_fig.tight_layout(pad=2.0, rect=[0, 0, 1, 0.95])
+                # Only apply tight_layout to plots without colorbars to avoid layout engine conflicts
+                colorbar_plots = ["Heatmap Per Model", "Correlation Matrix", "Violin Plot", "Radar Chart", "Statistical Significance"]
+                common_adjustments_needed = False
+                if plot_type not in colorbar_plots and common_adjustments_needed:
+                    try:
+                        self.current_plot_fig.tight_layout(pad=2.0, rect=[0, 0, 1, 0.95])
+                    except Exception as e:
+                        print(f"Warning: Could not apply tight_layout: {e}")
 
             # Create a new canvas if none exists, or update the existing one
             if self.plot_canvas is None:
