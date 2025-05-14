@@ -14,7 +14,53 @@ A visualization tool for analyzing and comparing Retrieval-Augmented Generation 
 - **Title and Label Customization**: Rename metrics and experiments for clearer visualization
 - **Box Plot Outlier Control**: Show or hide outliers in box plots
 - **High-Quality Export**: Save plots as PNG, PDF, or SVG for publications or presentations
+## Architecture
 
+The application has been refactored into a modular architecture following Model-View-Controller (MVC) pattern:
+
+```
+LLM_Evaluation_Plotter/
+├── main.py                    # Entry point
+├── app/
+│   ├── __init__.py            # Package initialization
+│   ├── config.py              # Configuration and constants
+│   ├── controllers/           # Controllers for application logic
+│   │   ├── __init__.py
+│   │   ├── file_controller.py  # Handles file operations
+│   │   └── plot_controller.py  # Manages plot generation
+│   ├── models/                # Data models
+│   │   ├── __init__.py
+│   │   └── experiment_data.py  # Manages experiment data
+│   ├── ui/                    # User interface components
+│   │   ├── __init__.py
+│   │   ├── main_window.py      # Main application window
+│   │   ├── control_panel.py    # Control panel UI
+│   │   └── plot_area.py        # Plot display area
+│   └── utils/                 # Utility functions
+│       ├── __init__.py
+│       ├── ui_utils.py         # UI helper functions
+│       └── plot_utils.py       # Plot helper functions
+```
+### Components
+
+- **Models**: Responsible for data handling and business logic
+  - `ExperimentData`: Manages loading, processing, and storing experiment data
+
+- **Controllers**: Handle application logic and connect models with views
+  - `FileController`: Manages file operations (browse, load, save)
+  - `PlotController`: Manages plot generation and configuration
+
+- **UI**: User interface components
+  - `MainWindow`: The main application window
+  - `ControlPanel`: Control panel for user input
+  - `PlotArea`: Area for displaying plots
+
+- **Utils**: Helper functions and utilities
+  - `ui_utils.py`: UI-related helper functions
+  - `plot_utils.py`: Plot-related helper functions
+
+- **Config**: Application configuration
+  - `config.py`: Contains constants and default settings
 ## Installation
 
 ### Prerequisites
@@ -47,7 +93,7 @@ This is the recommended installation method as it ensures all dependencies are p
 
 3. Run the application:
    ```bash
-   python evaluation_plotter.py
+   python main.py
    ```
 
 #### Alternative: Using Pip
@@ -155,6 +201,25 @@ When evaluation scores are closely grouped (e.g., all around 0.9), use the custo
 ## License
 
 [MIT License](LICENSE)
+
+## Design Patterns
+
+This implementation uses several design patterns:
+
+1. **MVC (Model-View-Controller)**: Separates data, presentation, and application logic.
+2. **Observer Pattern**: Components communicate through events/callbacks.
+3. **Factory Method**: Different plot types are created through specialized methods.
+4. **Facade Pattern**: Controllers provide a simplified interface to complex systems.
+
+## Future Enhancements
+
+This modular architecture makes it easy to implement future enhancements:
+
+1. Adding new plot types
+2. Supporting additional data formats
+3. Implementing data preprocessing options
+4. Adding statistical analysis features
+5. Creating plugin architecture for custom visualizations 
 
 ## Contributing
 
