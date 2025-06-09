@@ -52,6 +52,7 @@ class MainWindow:
         
         # Connect the components
         self.control_panel.on_generate_plot = self._generate_plot_with_indicator
+        self.control_panel.on_generate_latex = self._generate_latex_with_indicator
     
     def _generate_plot_with_indicator(self, plot_params):
         """
@@ -65,6 +66,35 @@ class MainWindow:
         
         try:
             self.plot_area.update_plot(plot_params)
+        finally:
+            if loading_win:
+                loading_win.destroy()
+    
+    def _generate_latex_with_indicator(self, latex_params):
+        """
+        Generate a LaTeX table with a loading indicator.
+        
+        Args:
+            latex_params: LaTeX generation parameters dictionary
+        """
+        loading_win = create_loading_window(self.root, "Generating LaTeX table...")
+        self.root.update_idletasks()
+        
+        try:
+            # Map UI selection to API data_type
+            data_type_map = {
+                "Means only": "means",
+                "Means with standard deviations": "means_with_std",
+                "Per test case data": "per_test_case"
+            }
+            
+            export_params = latex_params.copy()
+            export_params['data_type'] = data_type_map.get(latex_params.get('table_type', 'Means only'), "means")
+            
+            # Generate and save the LaTeX table
+            latex_code = self.plot_controller.export_to_latex(export_params)
+            if latex_code:
+                self.file_controller.save_latex_table(latex_code)
         finally:
             if loading_win:
                 loading_win.destroy()

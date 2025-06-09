@@ -6,7 +6,7 @@ import tkinter as tk
 from tkinter import ttk, messagebox
 import os
 
-from app.config import PLOT_TYPES, SIZE_PRESETS
+from app.config import PLOT_TYPES, SIZE_PRESETS, DEFAULT_FONT_SIZES, FONT_SIZE_PRESETS
 from app.utils.ui_utils import validate_float
 
 class ControlPanel:
@@ -52,6 +52,13 @@ class ControlPanel:
         self.show_outliers_var = tk.BooleanVar(value=True)
         self.output_format_var = tk.StringVar(value="Plot")
         self.latex_table_type_var = tk.StringVar(value="Means only")
+        self.show_titles_var = tk.BooleanVar(value=True)
+        
+        # Font size variables
+        self.font_preset_var = tk.StringVar(value="Large")
+        self.font_size_vars = {}
+        for key in DEFAULT_FONT_SIZES.keys():
+            self.font_size_vars[key] = tk.StringVar(value=str(DEFAULT_FONT_SIZES[key]))
         
         # UI components
         self._create_control_panel()
@@ -132,8 +139,55 @@ class ControlPanel:
         plot_type_combo = ttk.Combobox(frame, textvariable=self.plot_type_var, values=PLOT_TYPES, state="readonly")
         plot_type_combo.pack(fill=tk.X, pady=(0, 10))
         
-        # 4. Y-Axis Range (Zooming)
-        ttk.Label(frame, text="4. Y-Axis Range", font=("Arial", 12, "bold")).pack(anchor="w", pady=(0, 5))
+        # 4. Font Size Settings
+        ttk.Label(frame, text="4. Font Size Settings", font=("Arial", 12, "bold")).pack(anchor="w", pady=(0, 5))
+        
+        # Font size presets
+        preset_frame = ttk.Frame(frame)
+        preset_frame.pack(fill=tk.X, pady=(0, 5))
+        ttk.Label(preset_frame, text="Font Size Preset:").pack(side=tk.LEFT, padx=(0, 5))
+        font_preset_combo = ttk.Combobox(preset_frame, textvariable=self.font_preset_var, 
+                                        values=list(FONT_SIZE_PRESETS.keys()), state="readonly")
+        font_preset_combo.pack(side=tk.LEFT, fill=tk.X, expand=True)
+        font_preset_combo.bind('<<ComboboxSelected>>', self._on_font_preset_change)
+        
+        # Individual font size controls
+        font_controls_frame = ttk.LabelFrame(frame, text="Individual Font Sizes", padding=5)
+        font_controls_frame.pack(fill=tk.X, pady=(5, 10))
+        
+        # Create validation command for font size entries
+        vcmd_int = (self.parent.register(self._validate_int), '%P')
+        
+        font_labels = {
+            "title": "Plot Title:",
+            "subtitle": "Subtitle:",
+            "axis_title": "Axis Titles:",
+            "axis_labels": "Axis Labels:",
+            "legend": "Legend:",
+            "tick_labels": "Tick Labels:",
+            "annotations": "Annotations:"
+        }
+        
+        # Create two columns for font controls
+        left_col = ttk.Frame(font_controls_frame)
+        left_col.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(0, 5))
+        right_col = ttk.Frame(font_controls_frame)
+        right_col.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(5, 0))
+        
+        font_keys = list(font_labels.keys())
+        for i, key in enumerate(font_keys):
+            parent_col = left_col if i < len(font_keys) // 2 + 1 else right_col
+            
+            row_frame = ttk.Frame(parent_col)
+            row_frame.pack(fill=tk.X, pady=2)
+            
+            ttk.Label(row_frame, text=font_labels[key], width=12).pack(side=tk.LEFT)
+            entry = ttk.Entry(row_frame, textvariable=self.font_size_vars[key], width=6, 
+                            validate="key", validatecommand=vcmd_int)
+            entry.pack(side=tk.LEFT, padx=(5, 0))
+        
+        # 5. Y-Axis Range (Zooming)
+        ttk.Label(frame, text="5. Y-Axis Range", font=("Arial", 12, "bold")).pack(anchor="w", pady=(0, 5))
         
         ttk.Checkbutton(frame, text="Use Custom Y-Axis Range", variable=self.custom_y_range_var).pack(anchor="w")
         
@@ -149,8 +203,8 @@ class ControlPanel:
         self.y_max_entry = ttk.Entry(y_range_frame, width=8, validate="key", validatecommand=vcmd)
         self.y_max_entry.pack(side=tk.LEFT)
         
-        # 5. Plot Size
-        ttk.Label(frame, text="5. Plot Size", font=("Arial", 12, "bold")).pack(anchor="w", pady=(0, 5))
+        # 6. Plot Size
+        ttk.Label(frame, text="6. Plot Size", font=("Arial", 12, "bold")).pack(anchor="w", pady=(0, 5))
         
         size_frame = ttk.Frame(frame)
         size_frame.pack(fill=tk.X, pady=(0, 10))
@@ -189,8 +243,8 @@ class ControlPanel:
                                   command=lambda w=w, h=h: self._set_size_preset(w, h))
             preset_btn.pack(side=tk.LEFT, padx=(0, 5), fill=tk.X, expand=True)
         
-        # 6. Plot Title Settings
-        ttk.Label(frame, text="6. Plot Title Settings", font=("Arial", 12, "bold")).pack(anchor="w", pady=(0, 5))
+        # 7. Plot Title Settings
+        ttk.Label(frame, text="7. Plot Title Settings", font=("Arial", 12, "bold")).pack(anchor="w", pady=(0, 5))
         
         title_frame = ttk.Frame(frame)
         title_frame.pack(fill=tk.X, pady=(0, 5))
@@ -199,17 +253,26 @@ class ControlPanel:
         self.title_entry.pack(side=tk.LEFT, fill=tk.X, expand=True)
         
         subtitle_frame = ttk.Frame(frame)
-        subtitle_frame.pack(fill=tk.X, pady=(0, 10))
+        subtitle_frame.pack(fill=tk.X, pady=(0, 5))
         ttk.Label(subtitle_frame, text="Subtitle:").pack(side=tk.LEFT, padx=(0, 5))
         self.subtitle_entry = ttk.Entry(subtitle_frame)
         self.subtitle_entry.pack(side=tk.LEFT, fill=tk.X, expand=True)
         
-        # 7. Box Plot Settings
-        ttk.Label(frame, text="7. Box Plot Settings", font=("Arial", 12, "bold")).pack(anchor="w", pady=(0, 5))
+        y_axis_frame = ttk.Frame(frame)
+        y_axis_frame.pack(fill=tk.X, pady=(0, 5))
+        ttk.Label(y_axis_frame, text="Y-Axis Title:").pack(side=tk.LEFT, padx=(0, 5))
+        self.y_axis_title_entry = ttk.Entry(y_axis_frame)
+        self.y_axis_title_entry.pack(side=tk.LEFT, fill=tk.X, expand=True)
+        
+        # Show titles checkbox
+        ttk.Checkbutton(frame, text="Show plot titles", variable=self.show_titles_var).pack(anchor="w", pady=(0, 10))
+        
+        # 8. Box Plot Settings
+        ttk.Label(frame, text="8. Box Plot Settings", font=("Arial", 12, "bold")).pack(anchor="w", pady=(0, 5))
         ttk.Checkbutton(frame, text="Show Outliers", variable=self.show_outliers_var).pack(anchor="w", pady=(0, 10))
         
-        # 8. Customize Labels (Optional)
-        ttk.Label(frame, text="8. Customize Labels (Optional)", font=("Arial", 12, "bold")).pack(anchor="w", pady=(0, 5))
+        # 9. Customize Labels (Optional)
+        ttk.Label(frame, text="9. Customize Labels (Optional)", font=("Arial", 12, "bold")).pack(anchor="w", pady=(0, 5))
         
         ttk.Label(frame, text="Metric Display Names:").pack(anchor="w")
         self.metric_rename_frame = ttk.Frame(frame)  # Dynamic entries here
@@ -219,8 +282,8 @@ class ControlPanel:
         self.model_rename_frame = ttk.Frame(frame)  # Dynamic entries here
         self.model_rename_frame.pack(fill=tk.X, pady=(0, 10))
         
-        # 9. Output Format
-        ttk.Label(frame, text="9. Output Format", font=("Arial", 12, "bold")).pack(anchor="w", pady=(0, 5))
+        # 10. Output Format
+        ttk.Label(frame, text="10. Output Format", font=("Arial", 12, "bold")).pack(anchor="w", pady=(0, 5))
         
         format_frame = ttk.Frame(frame)
         format_frame.pack(fill=tk.X, pady=(0, 5))
@@ -230,7 +293,7 @@ class ControlPanel:
         ttk.Radiobutton(format_frame, text="LaTeX Table", variable=self.output_format_var, 
                       value="LaTeX", command=self._toggle_output_format).pack(side=tk.LEFT)
         
-        # 10. LaTeX Table Settings (initially hidden)
+        # 11. LaTeX Table Settings (initially hidden)
         self.latex_settings_frame = ttk.LabelFrame(frame, text="LaTeX Table Settings")
         
         latex_inner_frame = ttk.Frame(self.latex_settings_frame, padding=5)
@@ -254,10 +317,29 @@ class ControlPanel:
         # Initially hide the LaTeX settings since Plot is the default
         # Will be shown/hidden by _toggle_output_format
         
-        # 11. Generate Output
+        # 12. Generate Output
         self.generate_button = ttk.Button(frame, text="Generate Plot", command=self._generate_plot)
         self.generate_button.pack(fill=tk.X, pady=(10, 0))
     
+    def _validate_int(self, value):
+        """Validate that input is a positive integer."""
+        if value == "":
+            return True
+        try:
+            int_val = int(value)
+            return int_val > 0
+        except ValueError:
+            return False
+    
+    def _on_font_preset_change(self, event=None):
+        """Handle font preset selection change."""
+        preset_name = self.font_preset_var.get()
+        if preset_name in FONT_SIZE_PRESETS:
+            preset_sizes = FONT_SIZE_PRESETS[preset_name]
+            for key, size in preset_sizes.items():
+                if key in self.font_size_vars:
+                    self.font_size_vars[key].set(str(size))
+
     def _browse_files(self):
         """Browse and add files to the list."""
         files = self.file_controller.browse_files()
@@ -375,6 +457,16 @@ class ControlPanel:
             # Update button text
             self.generate_button.config(text="Generate LaTeX Table")
     
+    def _get_font_sizes(self):
+        """Get current font sizes from UI controls."""
+        font_sizes = {}
+        for key, var in self.font_size_vars.items():
+            try:
+                font_sizes[key] = int(var.get())
+            except ValueError:
+                font_sizes[key] = DEFAULT_FONT_SIZES[key]  # Use default if invalid
+        return font_sizes
+    
     def _generate_plot(self):
         """Generate plot or LaTeX table based on current settings."""
         if not self.model.experiment_data:
@@ -420,6 +512,7 @@ class ControlPanel:
             'selected_metrics': selected_metrics,
             'display_metrics': display_metrics,
             'display_experiments': display_experiments,
+            'font_sizes': self._get_font_sizes(),  # Add font sizes to parameters
         }
         
         # Check output format
@@ -430,39 +523,34 @@ class ControlPanel:
                 'plot_type': self.plot_type_var.get(),
                 'title': self.title_entry.get().strip(),
                 'subtitle': self.subtitle_entry.get().strip(),
+                'y_axis_title': self.y_axis_title_entry.get().strip(),
                 'use_custom_y_range': self.custom_y_range_var.get(),
                 'y_min': self.y_min_entry.get(),
                 'y_max': self.y_max_entry.get(),
                 'width': plot_width,
                 'height': plot_height,
-                'show_outliers': self.show_outliers_var.get()
+                'show_outliers': self.show_outliers_var.get(),
+                'show_titles': self.show_titles_var.get(),
             })
             
-            # Emit plot generation event
+            # Call the callback
             self.on_generate_plot(plot_params)
         else:
-            # Handle LaTeX table generation
-            latex_table_type = self.latex_table_type_var.get()
-            
-            # Map UI selection to API data_type
-            data_type_map = {
-                "Means only": "means",
-                "Means with standard deviations": "means_with_std",
-                "Per test case data": "per_test_case"
-            }
-            
-            export_params = base_params.copy()
-            export_params.update({
-                'data_type': data_type_map.get(latex_table_type, "means"),
+            # LaTeX table generation
+            latex_params = base_params.copy()
+            latex_params.update({
+                'table_type': self.latex_table_type_var.get(),
                 'caption': self.latex_caption_entry.get().strip(),
-                'label': self.latex_label_entry.get().strip()
+                'label': self.latex_label_entry.get().strip(),
             })
             
-            # Generate and save the LaTeX table
-            latex_code = self.plot_controller.export_to_latex(export_params)
-            if latex_code:
-                self.file_controller.save_latex_table(latex_code)
+            # Call the LaTeX generation method
+            self.on_generate_latex(latex_params)
     
     def on_generate_plot(self, plot_params):
-        """Callback function that will be overridden by the main application."""
+        """Callback method to be overridden by the parent."""
+        pass
+    
+    def on_generate_latex(self, latex_params):
+        """Callback method to be overridden by the parent."""
         pass 
