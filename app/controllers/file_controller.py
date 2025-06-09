@@ -166,7 +166,7 @@ class FileController:
         
         # Open save dialog
         filepath = filedialog.asksaveasfilename(
-            initialvalue=default_filename,
+            initialfile=default_filename,
             defaultextension=self.config_manager.CONFIG_EXTENSION,
             filetypes=[(self.config_manager.get_config_filter(), f"*{self.config_manager.CONFIG_EXTENSION}"),
                       ("All files", "*.*")],
