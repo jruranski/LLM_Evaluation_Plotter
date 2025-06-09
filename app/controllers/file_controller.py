@@ -5,6 +5,8 @@ Controller for file operations.
 import os
 from tkinter import filedialog, messagebox
 
+from app.utils.config_manager import ConfigManager
+
 class FileController:
     """Controller for file operations."""
     
@@ -17,6 +19,7 @@ class FileController:
         """
         self.model = model
         self.selected_files = []
+        self.config_manager = ConfigManager()
     
     def browse_files(self):
         """
@@ -146,4 +149,82 @@ class FileController:
             return True
         except Exception as e:
             messagebox.showerror("Save Error", f"Could not save LaTeX table: {e}")
+            return False
+    
+    def save_config(self, control_panel):
+        """
+        Save current plot configuration to a file.
+        
+        Args:
+            control_panel: ControlPanel instance to collect settings from
+            
+        Returns:
+            True if saved successfully, False otherwise
+        """
+        # Get default filename with timestamp
+        default_filename = self.config_manager.get_default_config_name()
+        
+        # Open save dialog
+        filepath = filedialog.asksaveasfilename(
+            initialvalue=default_filename,
+            defaultextension=self.config_manager.CONFIG_EXTENSION,
+            filetypes=[(self.config_manager.get_config_filter(), f"*{self.config_manager.CONFIG_EXTENSION}"),
+                      ("All files", "*.*")],
+            title="Save Plot Configuration As"
+        )
+        
+        if not filepath:
+            return False
+        
+        try:
+            # Collect configuration from UI
+            config_data = self.config_manager.collect_config_from_ui(control_panel, self)
+            
+            # Save configuration
+            if self.config_manager.save_config(config_data, filepath):
+                messagebox.showinfo("Success", f"Configuration saved to {filepath}")
+                return True
+            else:
+                return False
+                
+        except Exception as e:
+            messagebox.showerror("Save Error", f"Could not save configuration: {e}")
+            return False
+    
+    def load_config(self, control_panel):
+        """
+        Load plot configuration from a file.
+        
+        Args:
+            control_panel: ControlPanel instance to apply settings to
+            
+        Returns:
+            True if loaded successfully, False otherwise
+        """
+        # Open load dialog
+        filepath = filedialog.askopenfilename(
+            filetypes=[(self.config_manager.get_config_filter(), f"*{self.config_manager.CONFIG_EXTENSION}"),
+                      ("All files", "*.*")],
+            title="Load Plot Configuration"
+        )
+        
+        if not filepath:
+            return False
+        
+        try:
+            # Load configuration
+            config_data = self.config_manager.load_config(filepath)
+            
+            if config_data is None:
+                return False
+            
+            # Apply configuration to UI
+            if self.config_manager.apply_config_to_ui(config_data, control_panel, self):
+                messagebox.showinfo("Success", f"Configuration loaded from {filepath}")
+                return True
+            else:
+                return False
+                
+        except Exception as e:
+            messagebox.showerror("Load Error", f"Could not load configuration: {e}")
             return False 

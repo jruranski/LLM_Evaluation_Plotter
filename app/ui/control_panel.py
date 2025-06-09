@@ -129,6 +129,18 @@ class ControlPanel:
         load_button = ttk.Button(frame, text="Load & Process Selected Files", command=self._load_and_process_files)
         load_button.pack(fill=tk.X, pady=(0, 10))
         
+        # Configuration Save/Load Section
+        ttk.Label(frame, text="Configuration Save/Load", font=("Arial", 12, "bold")).pack(anchor="w", pady=(0, 5))
+        
+        config_btn_frame = ttk.Frame(frame)
+        config_btn_frame.pack(fill=tk.X, pady=(0, 10))
+        
+        save_config_button = ttk.Button(config_btn_frame, text="Save Configuration", command=self._save_config)
+        save_config_button.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 2))
+        
+        load_config_button = ttk.Button(config_btn_frame, text="Load Configuration", command=self._load_config)
+        load_config_button.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(2, 0))
+        
         # 2. Metric Selection
         ttk.Label(frame, text="2. Select Metrics to Plot (Y-axis)", font=("Arial", 12, "bold")).pack(anchor="w", pady=(0, 5))
         self.metric_selection_frame = ttk.Frame(frame)  # Dynamic checkbuttons here
@@ -385,6 +397,20 @@ class ControlPanel:
         """Load and process selected files."""
         if self.file_controller.load_and_process_files():
             self._update_ui_after_load()
+    
+    def _save_config(self):
+        """Save current configuration to a file."""
+        try:
+            self.file_controller.save_config(self)
+        except Exception as e:
+            messagebox.showerror("Save Configuration Error", f"Failed to save configuration:\n{str(e)}")
+    
+    def _load_config(self):
+        """Load configuration from a file."""
+        try:
+            self.file_controller.load_config(self)
+        except Exception as e:
+            messagebox.showerror("Load Configuration Error", f"Failed to load configuration:\n{str(e)}")
     
     def _update_ui_after_load(self):
         """Update UI components after loading data."""

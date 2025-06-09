@@ -13,6 +13,8 @@ A visualization tool for analyzing and comparing Retrieval-Augmented Generation 
 - **Customizable Dimensions**: Adjust plot sizes with presets or custom dimensions
 - **Title and Label Customization**: Rename metrics and experiments for clearer visualization
 - **Box Plot Outlier Control**: Show or hide outliers in box plots
+- **Comprehensive Font Controls**: Adjust font sizes for all plot elements with presets and individual controls
+- **Configuration Save/Load**: Save complete plot configurations including files, settings, and customizations for easy reproduction
 - **High-Quality Export**: Save plots as PNG, PDF, or SVG for publications or presentations
 ## Architecture
 
@@ -135,7 +137,44 @@ python evaluation_plotter.py
 
 The tool automatically groups multiple runs of the same experiment, calculating means and standard deviations across runs.
 
-#### 2. Compatible CSV Format
+#### 2. Saving and Loading Configurations
+
+The application provides a comprehensive configuration system that saves all your plot settings for easy reuse:
+
+**Saving a Configuration:**
+- Set up your plot exactly as desired (files, metrics, plot type, font sizes, customizations, etc.)
+- Click **Save Configuration** 
+- Choose a location and filename (`.plotconfig` extension will be added automatically)
+- The configuration file contains:
+  - All selected files and their paths
+  - All control panel settings (plot type, font sizes, Y-axis ranges, plot dimensions)
+  - Selected metrics and label customizations
+  - Plot titles and LaTeX settings
+  - All UI customizations
+
+**Loading a Configuration:**
+- Click **Load Configuration**
+- Select a previously saved `.plotconfig` file
+- The application will:
+  - Attempt to load all files from their saved paths
+  - Restore all plot settings exactly as they were saved
+  - Handle missing files gracefully (with user confirmation)
+  - Validate and fix any invalid settings
+
+**Configuration Features:**
+- **File Path Validation**: Warns about missing files and offers to continue with available files
+- **Version Compatibility**: Handles configuration files from different app versions
+- **Error Recovery**: Provides sensible defaults for any missing or invalid settings
+- **Timestamped Names**: Automatically suggests timestamped filenames for easy organization
+- **Complete State Preservation**: Saves every aspect of your plot setup
+
+This feature is perfect for:
+- Reproducing plots with identical settings
+- Sharing plot configurations with colleagues
+- Maintaining consistent formatting across multiple plots
+- Batch processing different datasets with the same visualization settings
+
+#### 3. Compatible CSV Format
 
 Your CSV files should contain:
 - One or more rows per experiment run
@@ -148,7 +187,7 @@ precision,recall,f1_score,latency_ms
 0.92,0.87,0.894,150.2
 ```
 
-#### 3. Creating Plots
+#### 4. Creating Plots
 
 1. Select metrics to compare
 2. Choose plot type (Bar Plot, Grouped Bar Plot, Line Plot, or Box Plot)
@@ -157,7 +196,7 @@ precision,recall,f1_score,latency_ms
 5. Add custom titles and subtitles
 6. Click **Generate Plot**
 
-#### 4. Saving Plots
+#### 5. Saving Plots
 
 After generating a plot, click **Save Plot** to export it as PNG, PDF, or SVG format.
 
