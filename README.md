@@ -14,6 +14,7 @@ A visualization tool for analyzing and comparing Retrieval-Augmented Generation 
 - **Title and Label Customization**: Rename metrics and experiments for clearer visualization
 - **Box Plot Outlier Control**: Show or hide outliers in box plots
 - **Comprehensive Font Controls**: Adjust font sizes for all plot elements with presets and individual controls
+- **Legend Positioning**: Full control over legend placement with 15+ position options, column layout, transparency, and frame settings
 - **Configuration Save/Load**: Save complete plot configurations including files, settings, and customizations for easy reproduction
 - **High-Quality Export**: Save plots as PNG, PDF, or SVG for publications or presentations
 ## Architecture
@@ -236,6 +237,27 @@ When evaluation scores are closely grouped (e.g., all around 0.9), use the custo
 
 - Use preset sizes for standard visualization needs
 - Set custom dimensions for specific publication or presentation requirements
+
+### Legend Positioning
+
+The application provides comprehensive legend control options:
+
+**Position Options:**
+- **Automatic**: "Best" position chosen by matplotlib
+- **Standard Positions**: Upper/lower left/right, center positions
+- **Outside Positions**: Place legends outside the plot area (top, bottom, left, right)
+- **Hide Legend**: Completely remove legends when not needed
+
+**Advanced Settings:**
+- **Column Layout**: Control number of legend columns (auto-detect or specify 1-5)
+- **Frame Control**: Show/hide legend frame with customizable transparency
+- **Transparency**: Adjust legend background opacity (50%-100%)
+
+**Usage Tips:**
+- Use "Bottom (outside)" for plots with many legend items
+- Use "Right (outside)" for plots with long experiment names
+- Adjust transparency to prevent legends from obscuring data points
+- Auto-column detection works well for most cases, but manual control is available for fine-tuning
 
 ## License
 

@@ -17,7 +17,9 @@ from app.utils.plot_utils import (
     add_title_and_subtitle,
     format_axis_ticks,
     apply_font_sizes_to_axis,
-    get_font_sizes_from_params
+    get_font_sizes_from_params,
+    configure_legend,
+    get_legend_settings_from_params
 )
 
 class PlotController:
@@ -146,6 +148,9 @@ class PlotController:
             # Get font sizes from parameters
             font_sizes = get_font_sizes_from_params(plot_params)
             
+            # Get legend settings from parameters
+            legend_settings = get_legend_settings_from_params(plot_params)
+            
             # Validate metrics
             if not selected_metrics:
                 messagebox.showerror("Error", "Please select at least one metric to plot.")
@@ -175,21 +180,21 @@ class PlotController:
                     experiment_names, selected_metrics[0], 
                     display_metrics, display_experiments,
                     custom_title, custom_subtitle, custom_y_label, show_titles,
-                    custom_y_range, y_min, y_max, font_sizes
+                    custom_y_range, y_min, y_max, font_sizes, legend_settings
                 )
             elif plot_type == "Grouped Bar Plot" or (plot_type == "Bar Plot" and len(selected_metrics) > 1):
                 success = self._generate_grouped_bar_plot(
                     experiment_names, selected_metrics,
                     display_metrics, display_experiments,
                     custom_title, custom_subtitle, custom_y_label, show_titles,
-                    custom_y_range, y_min, y_max, font_sizes
+                    custom_y_range, y_min, y_max, font_sizes, legend_settings
                 )
             elif plot_type == "Line Plot":
                 success = self._generate_line_plot(
                     experiment_names, selected_metrics,
                     display_metrics, display_experiments,
                     custom_title, custom_subtitle, custom_y_label, show_titles,
-                    custom_y_range, y_min, y_max, font_sizes
+                    custom_y_range, y_min, y_max, font_sizes, legend_settings
                 )
             elif plot_type == "Box Plot":
                 success = self._generate_box_plot(
@@ -197,53 +202,53 @@ class PlotController:
                     display_metrics, display_experiments,
                     custom_title, custom_subtitle, custom_y_label, show_titles,
                     custom_y_range, y_min, y_max,
-                    show_outliers, font_sizes
+                    show_outliers, font_sizes, legend_settings
                 )
             elif plot_type == "Per Test Case":
                 success = self._generate_per_test_case_plot(
                     experiment_names, selected_metrics[0],
                     display_metrics, display_experiments,
                     custom_title, custom_subtitle, custom_y_label, show_titles,
-                    custom_y_range, y_min, y_max, font_sizes
+                    custom_y_range, y_min, y_max, font_sizes, legend_settings
                 )
             elif plot_type == "Per Test Case Line Plot":
                 success = self._generate_per_test_case_line_plot(
                     experiment_names, selected_metrics,
                     display_metrics, display_experiments,
                     custom_title, custom_subtitle, custom_y_label, show_titles,
-                    custom_y_range, y_min, y_max, font_sizes
+                    custom_y_range, y_min, y_max, font_sizes, legend_settings
                 )
             elif plot_type == "Heatmap Per Model":
                 success = self._generate_heatmap_per_model(
                     experiment_names, selected_metrics,
                     display_metrics, display_experiments,
-                    custom_title, custom_subtitle, show_titles, font_sizes
+                    custom_title, custom_subtitle, show_titles, font_sizes, legend_settings
                 )
             elif plot_type == "Correlation Matrix":
                 success = self._generate_correlation_matrix(
                     experiment_names, selected_metrics,
                     display_metrics, display_experiments,
-                    custom_title, custom_subtitle, show_titles, font_sizes
+                    custom_title, custom_subtitle, show_titles, font_sizes, legend_settings
                 )
             elif plot_type == "Radar Chart":
                 success = self._generate_radar_chart(
                     experiment_names, selected_metrics,
                     display_metrics, display_experiments,
-                    custom_title, custom_subtitle, show_titles, font_sizes
+                    custom_title, custom_subtitle, show_titles, font_sizes, legend_settings
                 )
             elif plot_type == "Violin Plot":
                 success = self._generate_violin_plot(
                     experiment_names, selected_metrics[0],
                     display_metrics, display_experiments,
                     custom_title, custom_subtitle, custom_y_label, show_titles,
-                    custom_y_range, y_min, y_max, font_sizes
+                    custom_y_range, y_min, y_max, font_sizes, legend_settings
                 )
             elif plot_type == "Statistical Significance":
                 success = self._generate_statistical_significance(
                     experiment_names, selected_metrics[0],
                     display_metrics, display_experiments,
                     custom_title, custom_subtitle, custom_y_label, show_titles,
-                    custom_y_range, y_min, y_max, font_sizes
+                    custom_y_range, y_min, y_max, font_sizes, legend_settings
                 )
             else:
                 messagebox.showerror("Error", f"Unknown plot type: {plot_type}")
@@ -262,7 +267,7 @@ class PlotController:
     def _generate_bar_plot(self, experiment_names, metric, 
                           display_metrics, display_experiments,
                           custom_title, custom_subtitle, custom_y_label, show_titles,
-                          custom_y_range, y_min, y_max, font_sizes):
+                          custom_y_range, y_min, y_max, font_sizes, legend_settings):
         """Generate a simple bar plot for a single metric."""
         display_metric = display_metrics.get(metric, metric)
         
@@ -322,7 +327,7 @@ class PlotController:
     def _generate_grouped_bar_plot(self, experiment_names, selected_metrics,
                                   display_metrics, display_experiments, 
                                   custom_title, custom_subtitle, custom_y_label, show_titles,
-                                  custom_y_range, y_min, y_max, font_sizes):
+                                  custom_y_range, y_min, y_max, font_sizes, legend_settings):
         """Generate a grouped bar plot for multiple metrics."""
         # Add subplot
         ax = self.current_plot_fig.add_subplot(111)
@@ -360,9 +365,8 @@ class PlotController:
         # Set axis labels
         y_label = custom_y_label if custom_y_label else self._translate("Metric Value")
         ax.set_ylabel(y_label, fontsize=font_sizes['axis_title'])
-        ax.legend(title=self._translate("Metrics"), bbox_to_anchor=(0.5, -0.25), loc='upper center', 
-                 fontsize=font_sizes['legend'], title_fontsize=font_sizes['legend'], ncol=min(len(selected_metrics), 4),
-                 frameon=True, framealpha=0.9, borderpad=1.2, columnspacing=2.0)
+        # Configure legend
+        configure_legend(ax, legend_settings, font_sizes)
         
         # Add title and subtitle
         add_title_and_subtitle(
@@ -384,7 +388,7 @@ class PlotController:
     def _generate_line_plot(self, experiment_names, selected_metrics,
                            display_metrics, display_experiments,
                            custom_title, custom_subtitle, custom_y_label, show_titles,
-                           custom_y_range, y_min, y_max, font_sizes):
+                           custom_y_range, y_min, y_max, font_sizes, legend_settings):
         """Generate a line plot for one or more metrics."""
         # Add subplot
         ax = self.current_plot_fig.add_subplot(111)
@@ -407,10 +411,10 @@ class PlotController:
         # Set axis labels
         y_label = custom_y_label if custom_y_label else self._translate("Metric Value")
         ax.set_ylabel(y_label, fontsize=font_sizes['axis_title'])
+        
+        # Configure legend for multiple metrics
         if len(selected_metrics) > 1:
-            ax.legend(title=self._translate("Metrics"), bbox_to_anchor=(0.5, -0.25), loc='upper center', 
-                     fontsize=font_sizes['legend'], title_fontsize=font_sizes['legend'], ncol=min(len(selected_metrics), 4),
-                     frameon=True, framealpha=0.9, borderpad=1.2, columnspacing=2.0)
+            configure_legend(ax, legend_settings, font_sizes)
         
         # Add title and subtitle
         add_title_and_subtitle(
@@ -433,7 +437,7 @@ class PlotController:
                           display_metrics, display_experiments,
                           custom_title, custom_subtitle, custom_y_label, show_titles,
                           custom_y_range, y_min, y_max,
-                          show_outliers, font_sizes):
+                          show_outliers, font_sizes, legend_settings):
         """Generate a box plot for a single metric."""
         # Add subplot
         ax = self.current_plot_fig.add_subplot(111)
@@ -482,8 +486,8 @@ class PlotController:
         if show_outliers and bp.get('fliers', []):
             outlier_label = plt.Line2D([0], [0], marker='o', color='w', 
                                      markerfacecolor='black', markersize=8, label=self._translate('Outliers'))
-            ax.legend(handles=[outlier_label], loc='upper right', fontsize=font_sizes['legend'],
-                     frameon=True, framealpha=0.9, borderpad=1.0)
+            ax.legend(handles=[outlier_label])
+            configure_legend(ax, legend_settings, font_sizes)
         
         # Apply custom y-axis range if requested
         apply_y_axis_range(ax, custom_y_range, y_min, y_max)
@@ -497,7 +501,7 @@ class PlotController:
     def _generate_per_test_case_plot(self, experiment_names, metric,
                                     display_metrics, display_experiments,
                                     custom_title, custom_subtitle, custom_y_label, show_titles,
-                                    custom_y_range, y_min, y_max, font_sizes):
+                                    custom_y_range, y_min, y_max, font_sizes, legend_settings):
         """Generate a per-test case bar plot."""
         # Add subplot
         ax = self.current_plot_fig.add_subplot(111)
@@ -563,9 +567,7 @@ class PlotController:
         
         # Add legend
         if num_exps > 1:
-            ax.legend(bbox_to_anchor=(0.5, -0.28), loc='upper center', fontsize=font_sizes["legend"], 
-                     ncol=min(len(experiment_names), 3),
-                     frameon=True, framealpha=0.9, borderpad=1.2, columnspacing=2.0)
+            configure_legend(ax, legend_settings, font_sizes)
         
         # Add title and subtitle
         add_title_and_subtitle(
@@ -587,7 +589,7 @@ class PlotController:
     def _generate_per_test_case_line_plot(self, experiment_names, selected_metrics,
                                          display_metrics, display_experiments,
                                          custom_title, custom_subtitle, custom_y_label, show_titles,
-                                         custom_y_range, y_min, y_max, font_sizes):
+                                         custom_y_range, y_min, y_max, font_sizes, legend_settings):
         """Generate a line plot for test cases."""
         # Add subplot
         ax = self.current_plot_fig.add_subplot(111)
@@ -677,14 +679,9 @@ class PlotController:
         y_label = custom_y_label if custom_y_label else self._translate("Average Value")
         ax.set_ylabel(y_label, fontsize=font_sizes["axis_title"])
         
-        # Add legend if we have multiple lines
-        if len(legend_handles) > 1:
-            ax.legend(handles=legend_handles, bbox_to_anchor=(0.5, -0.25), loc='upper center', 
-                     fontsize=font_sizes["legend"], ncol=min(len(legend_handles), 3),
-                     frameon=True, framealpha=0.9, borderpad=1.2, columnspacing=2.0)
-        elif len(legend_handles) == 1:
-            ax.legend(handles=legend_handles, fontsize=font_sizes["legend"],
-                     frameon=True, framealpha=0.9, borderpad=1.0)
+        # Add legend if we have lines
+        if legend_handles:
+            configure_legend(ax, legend_settings, font_sizes)
         
         # Add title and subtitle
         add_title_and_subtitle(
@@ -705,7 +702,7 @@ class PlotController:
     
     def _generate_heatmap_per_model(self, experiment_names, selected_metrics,
                                    display_metrics, display_experiments,
-                                   custom_title, custom_subtitle, show_titles, font_sizes):
+                                   custom_title, custom_subtitle, show_titles, font_sizes, legend_settings):
         """Generate a heatmap per model."""
         # Create heatmap with one row per model and one column per metric
         # Add subplot
@@ -757,7 +754,7 @@ class PlotController:
     
     def _generate_correlation_matrix(self, experiment_names, selected_metrics,
                                     display_metrics, display_experiments,
-                                    custom_title, custom_subtitle, show_titles, font_sizes):
+                                    custom_title, custom_subtitle, show_titles, font_sizes, legend_settings):
         """Generate a correlation matrix."""
         # Create a correlation matrix between metrics
         ax = self.current_plot_fig.add_subplot(111)
@@ -826,7 +823,7 @@ class PlotController:
     
     def _generate_radar_chart(self, experiment_names, selected_metrics,
                              display_metrics, display_experiments,
-                             custom_title, custom_subtitle, show_titles, font_sizes):
+                             custom_title, custom_subtitle, show_titles, font_sizes, legend_settings):
         """Generate a radar chart comparing metrics across experiments."""
         # Check we have enough metrics for a radar chart
         if len(selected_metrics) < 3:
@@ -937,14 +934,8 @@ class PlotController:
         # Add subtle grid
         ax.grid(True, alpha=0.3, linestyle='--')
         
-        # Add legend with better positioning outside the plot
-        if len(experiment_names) > 1:
-            ax.legend(loc='upper right', bbox_to_anchor=(1.05, 1.0), frameon=True, 
-                    framealpha=0.9, fontsize=font_sizes["legend"], borderpad=1.0)
-        else:
-            # For single model, place legend at the bottom
-            ax.legend(loc='upper center', bbox_to_anchor=(0.5, -0.15), fontsize=font_sizes["legend"],
-                     frameon=True, framealpha=0.9, borderpad=1.0)
+        # Add legend
+        configure_legend(ax, legend_settings, font_sizes)
         
         # Add title and subtitle
         if show_titles:
@@ -966,7 +957,7 @@ class PlotController:
     def _generate_violin_plot(self, experiment_names, metric,
                              display_metrics, display_experiments,
                              custom_title, custom_subtitle, custom_y_label, show_titles,
-                             custom_y_range, y_min, y_max, font_sizes):
+                             custom_y_range, y_min, y_max, font_sizes, legend_settings):
         """Generate a violin plot."""
         # Add subplot
         ax = self.current_plot_fig.add_subplot(111)
@@ -1028,8 +1019,8 @@ class PlotController:
         # Add legend for mean and median
         mean_line = plt.Line2D([0], [0], color='black', linestyle='-', linewidth=2, label=self._translate('Mean'))
         median_line = plt.Line2D([0], [0], color='red', linestyle='-', linewidth=2, label=self._translate('Median'))
-        ax.legend(handles=[mean_line, median_line], loc='upper right', fontsize=font_sizes["legend"],
-                 frameon=True, framealpha=0.9, borderpad=1.0)
+        ax.legend(handles=[mean_line, median_line])
+        configure_legend(ax, legend_settings, font_sizes)
         
         # Add title and subtitle
         add_title_and_subtitle(
@@ -1051,7 +1042,7 @@ class PlotController:
     def _generate_statistical_significance(self, experiment_names, metric,
                                          display_metrics, display_experiments,
                                          custom_title, custom_subtitle, custom_y_label, show_titles,
-                                         custom_y_range, y_min, y_max, font_sizes):
+                                         custom_y_range, y_min, y_max, font_sizes, legend_settings):
         """Generate a statistical significance plot with bar plot."""
         # Add subplot
         ax = self.current_plot_fig.add_subplot(111)

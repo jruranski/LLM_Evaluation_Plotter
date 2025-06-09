@@ -53,6 +53,10 @@ class ControlPanel:
         self.output_format_var = tk.StringVar(value="Plot")
         self.latex_table_type_var = tk.StringVar(value="Means only")
         self.show_titles_var = tk.BooleanVar(value=True)
+        self.legend_position_var = tk.StringVar(value="best")
+        self.legend_ncol_var = tk.StringVar(value="auto")
+        self.legend_frameon_var = tk.BooleanVar(value=True)
+        self.legend_alpha_var = tk.StringVar(value="0.9")
         
         # Font size variables
         self.font_preset_var = tk.StringVar(value="Large")
@@ -283,8 +287,44 @@ class ControlPanel:
         ttk.Label(frame, text="8. Box Plot Settings", font=("Arial", 12, "bold")).pack(anchor="w", pady=(0, 5))
         ttk.Checkbutton(frame, text="Show Outliers", variable=self.show_outliers_var).pack(anchor="w", pady=(0, 10))
         
-        # 9. Customize Labels (Optional)
-        ttk.Label(frame, text="9. Customize Labels (Optional)", font=("Arial", 12, "bold")).pack(anchor="w", pady=(0, 5))
+        # 9. Legend Settings
+        ttk.Label(frame, text="9. Legend Settings", font=("Arial", 12, "bold")).pack(anchor="w", pady=(0, 5))
+        
+        # Legend position
+        legend_position_frame = ttk.Frame(frame)
+        legend_position_frame.pack(fill=tk.X, pady=(0, 5))
+        ttk.Label(legend_position_frame, text="Legend Position:").pack(side=tk.LEFT, padx=(0, 5))
+        legend_position_combo = ttk.Combobox(legend_position_frame, textvariable=self.legend_position_var, 
+                                           values=list(self._get_legend_positions().keys()), state="readonly", width=20)
+        legend_position_combo.pack(side=tk.LEFT, fill=tk.X, expand=True)
+        
+        # Advanced legend settings
+        legend_settings_frame = ttk.LabelFrame(frame, text="Advanced Legend Settings", padding=5)
+        legend_settings_frame.pack(fill=tk.X, pady=(5, 10))
+        
+        # Number of columns
+        ncol_frame = ttk.Frame(legend_settings_frame)
+        ncol_frame.pack(fill=tk.X, pady=2)
+        ttk.Label(ncol_frame, text="Columns:", width=12).pack(side=tk.LEFT)
+        legend_ncol_combo = ttk.Combobox(ncol_frame, textvariable=self.legend_ncol_var, 
+                                       values=["auto", "1", "2", "3", "4", "5"], state="readonly", width=8)
+        legend_ncol_combo.pack(side=tk.LEFT, padx=(5, 0))
+        
+        # Frame settings
+        legend_frame_frame = ttk.Frame(legend_settings_frame)
+        legend_frame_frame.pack(fill=tk.X, pady=2)
+        ttk.Checkbutton(legend_frame_frame, text="Show Legend Frame", variable=self.legend_frameon_var).pack(side=tk.LEFT)
+        
+        # Transparency
+        alpha_frame = ttk.Frame(legend_settings_frame)
+        alpha_frame.pack(fill=tk.X, pady=2)
+        ttk.Label(alpha_frame, text="Transparency:", width=12).pack(side=tk.LEFT)
+        alpha_combo = ttk.Combobox(alpha_frame, textvariable=self.legend_alpha_var, 
+                                 values=["0.5", "0.6", "0.7", "0.8", "0.9", "1.0"], state="readonly", width=8)
+        alpha_combo.pack(side=tk.LEFT, padx=(5, 0))
+        
+        # 10. Customize Labels (Optional)
+        ttk.Label(frame, text="10. Customize Labels (Optional)", font=("Arial", 12, "bold")).pack(anchor="w", pady=(0, 5))
         
         ttk.Label(frame, text="Metric Display Names:").pack(anchor="w")
         self.metric_rename_frame = ttk.Frame(frame)  # Dynamic entries here
@@ -294,8 +334,8 @@ class ControlPanel:
         self.model_rename_frame = ttk.Frame(frame)  # Dynamic entries here
         self.model_rename_frame.pack(fill=tk.X, pady=(0, 10))
         
-        # 10. Output Format
-        ttk.Label(frame, text="10. Output Format", font=("Arial", 12, "bold")).pack(anchor="w", pady=(0, 5))
+        # 11. Output Format
+        ttk.Label(frame, text="11. Output Format", font=("Arial", 12, "bold")).pack(anchor="w", pady=(0, 5))
         
         format_frame = ttk.Frame(frame)
         format_frame.pack(fill=tk.X, pady=(0, 5))
@@ -305,7 +345,7 @@ class ControlPanel:
         ttk.Radiobutton(format_frame, text="LaTeX Table", variable=self.output_format_var, 
                       value="LaTeX", command=self._toggle_output_format).pack(side=tk.LEFT)
         
-        # 11. LaTeX Table Settings (initially hidden)
+        # 12. LaTeX Table Settings (initially hidden)
         self.latex_settings_frame = ttk.LabelFrame(frame, text="LaTeX Table Settings")
         
         latex_inner_frame = ttk.Frame(self.latex_settings_frame, padding=5)
@@ -329,7 +369,7 @@ class ControlPanel:
         # Initially hide the LaTeX settings since Plot is the default
         # Will be shown/hidden by _toggle_output_format
         
-        # 12. Generate Output
+        # 13. Generate Output
         self.generate_button = ttk.Button(frame, text="Generate Plot", command=self._generate_plot)
         self.generate_button.pack(fill=tk.X, pady=(10, 0))
     
@@ -557,6 +597,10 @@ class ControlPanel:
                 'height': plot_height,
                 'show_outliers': self.show_outliers_var.get(),
                 'show_titles': self.show_titles_var.get(),
+                'legend_position': self.legend_position_var.get(),
+                'legend_ncol': self.legend_ncol_var.get(),
+                'legend_frameon': self.legend_frameon_var.get(),
+                'legend_alpha': self.legend_alpha_var.get(),
             })
             
             # Call the callback
@@ -579,4 +623,39 @@ class ControlPanel:
     
     def on_generate_latex(self, latex_params):
         """Callback method to be overridden by the parent."""
-        pass 
+        pass
+
+    def _get_legend_positions(self):
+        """Get available legend positions with descriptions."""
+        return {
+            "best": "Best (automatic)",
+            "upper right": "Upper Right",
+            "upper left": "Upper Left", 
+            "lower left": "Lower Left",
+            "lower right": "Lower Right",
+            "right": "Right (outside)",
+            "center left": "Center Left",
+            "center right": "Center Right",
+            "lower center": "Lower Center",
+            "upper center": "Upper Center",
+            "center": "Center",
+            "bottom": "Bottom (outside)",
+            "top": "Top (outside)",
+            "left": "Left (outside)",
+            "none": "None (hide legend)"
+        }
+    
+    def get_legend_settings(self):
+        """Get the current legend settings."""
+        ncol = self.legend_ncol_var.get()
+        if ncol == "auto":
+            ncol = None
+        else:
+            ncol = int(ncol)
+            
+        return {
+            'position': self.legend_position_var.get(),
+            'ncol': ncol,
+            'frameon': self.legend_frameon_var.get(),
+            'alpha': float(self.legend_alpha_var.get())
+        } 

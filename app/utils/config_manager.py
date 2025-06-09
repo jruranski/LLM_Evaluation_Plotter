@@ -124,6 +124,14 @@ class ConfigManager:
                 }
             },
             
+            # Legend settings
+            "legend_settings": {
+                "position": control_panel.legend_position_var.get(),
+                "ncol": control_panel.legend_ncol_var.get(),
+                "frameon": control_panel.legend_frameon_var.get(),
+                "alpha": control_panel.legend_alpha_var.get()
+            },
+            
             # Y-axis settings
             "y_axis_settings": {
                 "use_custom_range": control_panel.custom_y_range_var.get(),
@@ -235,6 +243,13 @@ class ConfigManager:
             for key, var in control_panel.font_size_vars.items():
                 if key in individual_sizes:
                     var.set(individual_sizes[key])
+            
+            # Apply legend settings
+            legend_settings = config.get("legend_settings", {})
+            control_panel.legend_position_var.set(legend_settings.get("position", "best"))
+            control_panel.legend_ncol_var.set(legend_settings.get("ncol", "auto"))
+            control_panel.legend_frameon_var.set(legend_settings.get("frameon", True))
+            control_panel.legend_alpha_var.set(legend_settings.get("alpha", "0.9"))
             
             # Apply Y-axis settings
             y_axis_settings = config.get("y_axis_settings", {})
@@ -356,6 +371,12 @@ class ConfigManager:
             "font_settings": {
                 "font_preset": "Large",
                 "individual_sizes": DEFAULT_FONT_SIZES.copy()
+            },
+            "legend_settings": {
+                "position": "best",
+                "ncol": "auto",
+                "frameon": True,
+                "alpha": "0.9"
             },
             "y_axis_settings": {
                 "use_custom_range": False,

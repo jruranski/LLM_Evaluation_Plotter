@@ -180,4 +180,117 @@ def get_font_sizes_from_params(plot_params):
         if key not in font_sizes:
             font_sizes[key] = default_value
     
-    return font_sizes 
+    return font_sizes
+
+def configure_legend(ax, legend_settings, font_sizes=None):
+    """
+    Configure legend positioning and appearance.
+    
+    Args:
+        ax: Matplotlib axis
+        legend_settings: Dictionary with legend configuration
+        font_sizes: Dictionary with font sizes or None to use defaults
+    """
+    if not ax:
+        return
+    
+    if font_sizes is None:
+        font_sizes = DEFAULT_FONT_SIZES
+    
+    position = legend_settings.get('position', 'best')
+    
+    # Hide legend if requested
+    if position == 'none':
+        legend = ax.get_legend()
+        if legend:
+            legend.remove()
+        return
+    
+    # Get legend parameters
+    ncol = legend_settings.get('ncol', 1)
+    frameon = legend_settings.get('frameon', True)
+    alpha = legend_settings.get('alpha', 0.9)
+    
+    # Handle special position cases (outside plot area)
+    bbox_to_anchor = None
+    loc = position
+    
+    if position == 'bottom':
+        bbox_to_anchor = (0.5, -0.15)
+        loc = 'upper center'
+        if ncol is None:
+            ncol = min(len(ax.get_legend_handles_labels()[0]), 4)  # Auto-determine columns
+    elif position == 'top':
+        bbox_to_anchor = (0.5, 1.15)
+        loc = 'lower center'
+        if ncol is None:
+            ncol = min(len(ax.get_legend_handles_labels()[0]), 4)
+    elif position == 'left':
+        bbox_to_anchor = (-0.15, 0.5)
+        loc = 'center right'
+        ncol = 1  # Force single column for left placement
+    elif position == 'right':
+        bbox_to_anchor = (1.15, 0.5)
+        loc = 'center left'
+        ncol = 1  # Force single column for right placement
+    else:
+        # Use built-in matplotlib positions
+        if ncol is None:
+            ncol = 1  # Default to single column for internal positions
+    
+    # Create or update legend
+    try:
+        if bbox_to_anchor:
+            legend = ax.legend(
+                loc=loc,
+                bbox_to_anchor=bbox_to_anchor,
+                ncol=ncol,
+                frameon=frameon,
+                fontsize=font_sizes["legend"],
+                fancybox=True,
+                shadow=True if frameon else False
+            )
+        else:
+            legend = ax.legend(
+                loc=loc,
+                ncol=ncol,
+                frameon=frameon,
+                fontsize=font_sizes["legend"],
+                fancybox=True,
+                shadow=True if frameon else False
+            )
+        
+        # Set transparency
+        if legend and frameon:
+            legend.get_frame().set_alpha(alpha)
+            
+    except Exception as e:
+        print(f"Warning: Could not configure legend: {e}")
+        # Fall back to basic legend
+        ax.legend(fontsize=font_sizes["legend"])
+
+def get_legend_settings_from_params(plot_params):
+    """
+    Extract legend settings from plot parameters.
+    
+    Args:
+        plot_params: Dictionary containing plot parameters
+        
+    Returns:
+        Dictionary with legend settings
+    """
+    ncol = plot_params.get('legend_ncol', 'auto')
+    if ncol == 'auto':
+        ncol = None
+    else:
+        try:
+            ncol = int(ncol)
+        except (ValueError, TypeError):
+            ncol = None
+    
+    return {
+        'position': plot_params.get('legend_position', 'best'),
+        'ncol': ncol,
+        'frameon': plot_params.get('legend_frameon', True),
+        'alpha': float(plot_params.get('legend_alpha', 0.9))
+    } 
