@@ -4,12 +4,30 @@ Control panel UI component.
 
 import tkinter as tk
 from tkinter import ttk, messagebox
+import os
 
 from app.config import PLOT_TYPES, SIZE_PRESETS
 from app.utils.ui_utils import validate_float
 
 class ControlPanel:
     """Control panel UI component."""
+    
+    # Metric name translations
+    METRIC_TRANSLATIONS = {
+        "Contextual Metric Score": "Trafność kontekstu",
+        "Contextual Precision Score": "Precyzja kontekstu",
+        "Correctness Metric Score": "Poprawność odpowiedzi",
+        "Faithfulness Metric Score": "Wierność odpowiedzi",
+        "Metric Score": "Trafność odpowiedzi",
+        "Test Case": "Test Case"
+    }
+    
+    # LaTeX table types
+    LATEX_TABLE_TYPES = [
+        "Means only",
+        "Means with standard deviations",
+        "Per test case data"
+    ]
     
     def __init__(self, parent, file_controller, plot_controller):
         """
@@ -32,6 +50,8 @@ class ControlPanel:
         self.plot_type_var = tk.StringVar(value="Bar Plot")
         self.custom_y_range_var = tk.BooleanVar(value=False)
         self.show_outliers_var = tk.BooleanVar(value=True)
+        self.output_format_var = tk.StringVar(value="Plot")
+        self.latex_table_type_var = tk.StringVar(value="Means only")
         
         # UI components
         self._create_control_panel()
@@ -85,8 +105,20 @@ class ControlPanel:
         ttk.Label(frame, text="1. Select Evaluation Files", font=("Arial", 12, "bold")).pack(anchor="w", pady=(0, 5))
         self.file_listbox = tk.Listbox(frame, selectmode=tk.EXTENDED, height=7, width=45)
         self.file_listbox.pack(fill=tk.X, expand=True, pady=(0, 5))
-        browse_button = ttk.Button(frame, text="Browse Files", command=self._browse_files)
-        browse_button.pack(fill=tk.X, pady=(0, 5))
+        
+        # File operation buttons
+        file_btn_frame = ttk.Frame(frame)
+        file_btn_frame.pack(fill=tk.X, pady=(0, 5))
+        
+        browse_button = ttk.Button(file_btn_frame, text="Add Files", command=self._browse_files)
+        browse_button.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 2))
+        
+        remove_button = ttk.Button(file_btn_frame, text="Remove Selected", command=self._remove_selected_files)
+        remove_button.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=2)
+        
+        clear_button = ttk.Button(file_btn_frame, text="Clear All", command=self._clear_files)
+        clear_button.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(2, 0))
+        
         load_button = ttk.Button(frame, text="Load & Process Selected Files", command=self._load_and_process_files)
         load_button.pack(fill=tk.X, pady=(0, 10))
         
@@ -187,17 +219,85 @@ class ControlPanel:
         self.model_rename_frame = ttk.Frame(frame)  # Dynamic entries here
         self.model_rename_frame.pack(fill=tk.X, pady=(0, 10))
         
-        # 9. Generate Plot
-        generate_button = ttk.Button(frame, text="Generate Plot", command=self._generate_plot)
-        generate_button.pack(fill=tk.X, pady=(10, 0))
+        # 9. Output Format
+        ttk.Label(frame, text="9. Output Format", font=("Arial", 12, "bold")).pack(anchor="w", pady=(0, 5))
+        
+        format_frame = ttk.Frame(frame)
+        format_frame.pack(fill=tk.X, pady=(0, 5))
+        
+        ttk.Radiobutton(format_frame, text="Plot", variable=self.output_format_var, 
+                      value="Plot", command=self._toggle_output_format).pack(side=tk.LEFT, padx=(0, 10))
+        ttk.Radiobutton(format_frame, text="LaTeX Table", variable=self.output_format_var, 
+                      value="LaTeX", command=self._toggle_output_format).pack(side=tk.LEFT)
+        
+        # 10. LaTeX Table Settings (initially hidden)
+        self.latex_settings_frame = ttk.LabelFrame(frame, text="LaTeX Table Settings")
+        
+        latex_inner_frame = ttk.Frame(self.latex_settings_frame, padding=5)
+        latex_inner_frame.pack(fill=tk.X, expand=True)
+        
+        ttk.Label(latex_inner_frame, text="Table Type:").pack(anchor="w", pady=(0, 5))
+        latex_type_combo = ttk.Combobox(latex_inner_frame, textvariable=self.latex_table_type_var, 
+                                     values=self.LATEX_TABLE_TYPES, state="readonly")
+        latex_type_combo.pack(fill=tk.X, pady=(0, 5))
+        
+        ttk.Label(latex_inner_frame, text="Table Caption:").pack(anchor="w", pady=(0, 5))
+        self.latex_caption_entry = ttk.Entry(latex_inner_frame)
+        self.latex_caption_entry.insert(0, "Experimental Results")
+        self.latex_caption_entry.pack(fill=tk.X, pady=(0, 5))
+        
+        ttk.Label(latex_inner_frame, text="Table Label:").pack(anchor="w", pady=(0, 5))
+        self.latex_label_entry = ttk.Entry(latex_inner_frame)
+        self.latex_label_entry.insert(0, "tab:results")
+        self.latex_label_entry.pack(fill=tk.X, pady=(0, 5))
+        
+        # Initially hide the LaTeX settings since Plot is the default
+        # Will be shown/hidden by _toggle_output_format
+        
+        # 11. Generate Output
+        self.generate_button = ttk.Button(frame, text="Generate Plot", command=self._generate_plot)
+        self.generate_button.pack(fill=tk.X, pady=(10, 0))
     
     def _browse_files(self):
-        """Browse and select files."""
+        """Browse and add files to the list."""
         files = self.file_controller.browse_files()
         if files:
-            self.file_listbox.delete(0, tk.END)
-            for filename in self.file_controller.get_selected_filenames():
-                self.file_listbox.insert(tk.END, filename)
+            self._update_file_listbox()
+    
+    def _clear_files(self):
+        """Clear all files from the list."""
+        self.file_controller.clear_files()
+        self.file_listbox.delete(0, tk.END)
+    
+    def _remove_selected_files(self):
+        """Remove selected files from the list."""
+        selected_indices = self.file_listbox.curselection()
+        if not selected_indices:
+            messagebox.showinfo("Information", "No files selected to remove.")
+            return
+        
+        # Get the full paths of selected files
+        selected_files = []
+        for idx in selected_indices:
+            filename = self.file_listbox.get(idx)
+            # Find the corresponding full path
+            for full_path in self.file_controller.selected_files:
+                if os.path.basename(full_path) == filename:
+                    selected_files.append(full_path)
+                    break
+        
+        # Remove each selected file
+        for file_path in selected_files:
+            self.file_controller.remove_file(file_path)
+        
+        # Update the listbox
+        self._update_file_listbox()
+    
+    def _update_file_listbox(self):
+        """Update the file listbox with current selected files."""
+        self.file_listbox.delete(0, tk.END)
+        for filename in self.file_controller.get_selected_filenames():
+            self.file_listbox.insert(tk.END, filename)
     
     def _load_and_process_files(self):
         """Load and process selected files."""
@@ -230,7 +330,11 @@ class ControlPanel:
                 row_frame.pack(fill=tk.X)
                 ttk.Label(row_frame, text=f"{metric[:25]}:", width=28, anchor='w').pack(side=tk.LEFT)  # Truncate long original names
                 entry = ttk.Entry(row_frame, width=25)
-                entry.insert(0, metric)  # Default to original name
+                
+                # Use translation if available, otherwise use original name
+                display_name = self.METRIC_TRANSLATIONS.get(metric, metric)
+                entry.insert(0, display_name)
+                
                 entry.pack(side=tk.LEFT, fill=tk.X, expand=True)
                 self.metric_rename_entries[metric] = entry
         
@@ -254,8 +358,25 @@ class ControlPanel:
         self.plot_height_entry.delete(0, tk.END)
         self.plot_height_entry.insert(0, str(height))
     
+    def _toggle_output_format(self):
+        """Toggle between plot and LaTeX table output formats."""
+        if self.output_format_var.get() == "Plot":
+            # Hide LaTeX settings, show plot-specific settings
+            if self.latex_settings_frame.winfo_ismapped():
+                self.latex_settings_frame.pack_forget()
+            
+            # Update button text
+            self.generate_button.config(text="Generate Plot")
+        else:
+            # Show LaTeX settings, hide plot-specific settings
+            if not self.latex_settings_frame.winfo_ismapped():
+                self.latex_settings_frame.pack(fill=tk.X, pady=(0, 10))
+            
+            # Update button text
+            self.generate_button.config(text="Generate LaTeX Table")
+    
     def _generate_plot(self):
-        """Generate plot based on current settings."""
+        """Generate plot or LaTeX table based on current settings."""
         if not self.model.experiment_data:
             messagebox.showerror("Error", "No data loaded. Please load and process files first.")
             return
@@ -271,6 +392,11 @@ class ControlPanel:
             display_name = entry.get().strip()
             if display_name:  # Only include non-empty names
                 display_metrics[metric] = display_name
+        
+        # Apply automatic translations (user-defined names take precedence)
+        for metric in selected_metrics:
+            if metric in self.METRIC_TRANSLATIONS and metric not in display_metrics:
+                display_metrics[metric] = self.METRIC_TRANSLATIONS[metric]
         
         # Create a dict of display names for experiments
         display_experiments = {}
@@ -289,24 +415,53 @@ class ControlPanel:
         except ValueError:
             plot_width, plot_height = 10, 6  # Default if invalid input
         
-        # Create plot parameters
-        plot_params = {
-            'plot_type': self.plot_type_var.get(),
+        # Create base parameters (common to both plot and LaTeX)
+        base_params = {
             'selected_metrics': selected_metrics,
             'display_metrics': display_metrics,
             'display_experiments': display_experiments,
-            'title': self.title_entry.get().strip(),
-            'subtitle': self.subtitle_entry.get().strip(),
-            'use_custom_y_range': self.custom_y_range_var.get(),
-            'y_min': self.y_min_entry.get(),
-            'y_max': self.y_max_entry.get(),
-            'width': plot_width,
-            'height': plot_height,
-            'show_outliers': self.show_outliers_var.get()
         }
         
-        # Emit plot generation event
-        self.on_generate_plot(plot_params)
+        # Check output format
+        if self.output_format_var.get() == "Plot":
+            # Create plot-specific parameters
+            plot_params = base_params.copy()
+            plot_params.update({
+                'plot_type': self.plot_type_var.get(),
+                'title': self.title_entry.get().strip(),
+                'subtitle': self.subtitle_entry.get().strip(),
+                'use_custom_y_range': self.custom_y_range_var.get(),
+                'y_min': self.y_min_entry.get(),
+                'y_max': self.y_max_entry.get(),
+                'width': plot_width,
+                'height': plot_height,
+                'show_outliers': self.show_outliers_var.get()
+            })
+            
+            # Emit plot generation event
+            self.on_generate_plot(plot_params)
+        else:
+            # Handle LaTeX table generation
+            latex_table_type = self.latex_table_type_var.get()
+            
+            # Map UI selection to API data_type
+            data_type_map = {
+                "Means only": "means",
+                "Means with standard deviations": "means_with_std",
+                "Per test case data": "per_test_case"
+            }
+            
+            export_params = base_params.copy()
+            export_params.update({
+                'data_type': data_type_map.get(latex_table_type, "means"),
+                'caption': self.latex_caption_entry.get().strip(),
+                'label': self.latex_label_entry.get().strip()
+            })
+            
+            # Generate and save the LaTeX table
+            latex_code = self.plot_controller.export_to_latex(export_params)
+            if latex_code:
+                self.file_controller.save_latex_table(latex_code)
     
     def on_generate_plot(self, plot_params):
         """Callback function that will be overridden by the main application."""
