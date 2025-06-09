@@ -20,17 +20,44 @@ class FileController:
     
     def browse_files(self):
         """
-        Open a file dialog for selecting CSV files.
+        Open a file dialog for selecting CSV files and add them to the current selection.
         
         Returns:
-            List of selected file paths or empty list if cancelled
+            List of selected file paths
         """
         files = filedialog.askopenfilenames(
             title="Select CSV Evaluation Files",
             filetypes=(("CSV files", "*.csv"), ("All files", "*.*"))
         )
         if files:
-            self.selected_files = list(files)
+            # Add only files that aren't already in the list
+            for file in files:
+                if file not in self.selected_files:
+                    self.selected_files.append(file)
+        return self.selected_files
+    
+    def clear_files(self):
+        """
+        Clear all selected files.
+        
+        Returns:
+            Empty list
+        """
+        self.selected_files = []
+        return self.selected_files
+    
+    def remove_file(self, file_path):
+        """
+        Remove a specific file from the selection.
+        
+        Args:
+            file_path: Path of the file to remove
+            
+        Returns:
+            Updated list of selected files
+        """
+        if file_path in self.selected_files:
+            self.selected_files.remove(file_path)
         return self.selected_files
     
     def get_selected_filenames(self):
@@ -88,4 +115,35 @@ class FileController:
             return True
         except Exception as e:
             messagebox.showerror("Save Error", f"Could not save plot: {e}")
+            return False
+    
+    def save_latex_table(self, latex_code):
+        """
+        Save LaTeX table code to a file.
+        
+        Args:
+            latex_code: The LaTeX table code to save
+            
+        Returns:
+            True if saved successfully, False otherwise
+        """
+        if not latex_code:
+            messagebox.showerror("Error", "No LaTeX table code generated to save.")
+            return False
+
+        filepath = filedialog.asksaveasfilename(
+            defaultextension=".tex",
+            filetypes=[("LaTeX files", "*.tex"), ("Text files", "*.txt"), ("All files", "*.*")],
+            title="Save LaTeX Table As"
+        )
+        if not filepath:
+            return False
+
+        try:
+            with open(filepath, 'w') as f:
+                f.write(latex_code)
+            messagebox.showinfo("Success", f"LaTeX table saved to {filepath}")
+            return True
+        except Exception as e:
+            messagebox.showerror("Save Error", f"Could not save LaTeX table: {e}")
             return False 

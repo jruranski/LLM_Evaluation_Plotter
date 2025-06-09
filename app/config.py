@@ -44,6 +44,58 @@ COLORBAR_PLOTS = [
     "Statistical Significance"
 ]
 
+# Default font sizes - radically increased for better visibility
+DEFAULT_FONT_SIZES = {
+    "title": 28,
+    "subtitle": 22,
+    "axis_title": 20,
+    "axis_labels": 18,
+    "legend": 16,
+    "tick_labels": 16,
+    "annotations": 14
+}
+
+# Font size presets for easy selection
+FONT_SIZE_PRESETS = {
+    "Small": {
+        "title": 16,
+        "subtitle": 14,
+        "axis_title": 12,
+        "axis_labels": 10,
+        "legend": 10,
+        "tick_labels": 10,
+        "annotations": 8
+    },
+    "Medium": {
+        "title": 20,
+        "subtitle": 16,
+        "axis_title": 14,
+        "axis_labels": 12,
+        "legend": 12,
+        "tick_labels": 12,
+        "annotations": 10
+    },
+    "Large": DEFAULT_FONT_SIZES,
+    "Extra Large": {
+        "title": 32,
+        "subtitle": 26,
+        "axis_title": 24,
+        "axis_labels": 22,
+        "legend": 20,
+        "tick_labels": 20,
+        "annotations": 18
+    },
+    "Presentation": {
+        "title": 40,
+        "subtitle": 32,
+        "axis_title": 28,
+        "axis_labels": 26,
+        "legend": 24,
+        "tick_labels": 24,
+        "annotations": 22
+    }
+}
+
 # Setup matplotlib defaults
 def configure_matplotlib():
     """Configure matplotlib defaults for this application."""
@@ -55,16 +107,17 @@ def configure_matplotlib():
         except OSError:
             print("Warning: Neither 'seaborn-v0_8-whitegrid' nor 'ggplot' styles found. Using Matplotlib default.")
 
+    # Use the new radically increased default font sizes
     plt.rcParams.update({
         "font.family": "serif",
         "font.serif": ["Times New Roman", "DejaVu Serif", "serif"],  # Fallback fonts
-        "font.size": 10,
-        "axes.labelsize": 12,
-        "axes.titlesize": 14,
-        "xtick.labelsize": 10,
-        "ytick.labelsize": 10,
-        "legend.fontsize": 10,
-        "figure.titlesize": 16,
+        "font.size": DEFAULT_FONT_SIZES["annotations"],
+        "axes.labelsize": DEFAULT_FONT_SIZES["axis_labels"],
+        "axes.titlesize": DEFAULT_FONT_SIZES["axis_title"],
+        "xtick.labelsize": DEFAULT_FONT_SIZES["tick_labels"],
+        "ytick.labelsize": DEFAULT_FONT_SIZES["tick_labels"],
+        "legend.fontsize": DEFAULT_FONT_SIZES["legend"],
+        "figure.titlesize": DEFAULT_FONT_SIZES["title"],
         "figure.dpi": 100,  # Default for display
         "lines.linewidth": 1.5,
         "lines.markersize": 6,
