@@ -29,7 +29,7 @@ class PlotController:
     POLISH_TRANSLATIONS = {
         # Axis labels
         "Models": "Modele",
-        "Metric Value": "Wartość Metryki",
+        "Metric Value": "Wartość metryki",
         "Average Value": "Średnia Wartość",
         "Test Case": "Przypadek Testowy",
         
@@ -558,7 +558,7 @@ class PlotController:
         
         # Set x-axis labels
         ax.set_xticks(np.arange(len(test_case_labels)))
-        ax.set_xticklabels(test_case_labels, fontsize=font_sizes["annotations"], rotation=45, ha='right')
+        ax.set_xticklabels(test_case_labels, fontsize=font_sizes["tick_labels"], rotation=45, ha='right')
         ax.set_xlabel(self._translate("Test Case"), fontsize=font_sizes["axis_title"])
         
         # Set y-axis label
@@ -729,7 +729,7 @@ class PlotController:
         # Create heatmap
         sns.heatmap(heatmap_df, ax=ax, cmap=cmap, annot=True, fmt=".3f", 
                   linewidths=1, cbar_kws={"shrink": 0.8}, vmin=None, vmax=None,
-                  annot_kws={"fontsize": 12})
+                  annot_kws={"fontsize": font_sizes["annotations"]})
         
         # Adjust labels
         ax.set_xlabel(self._translate("Metrics"), fontsize=font_sizes["axis_title"])
@@ -744,8 +744,8 @@ class PlotController:
                     fontsize=font_sizes["subtitle"], transform=ax.transAxes, style='italic')
         
         # Format axis ticks - we need special handling for heatmaps
-        ax.set_xticklabels(ax.get_xticklabels(), rotation=45, ha='right', fontsize=font_sizes["legend"])
-        ax.set_yticklabels(ax.get_yticklabels(), fontsize=font_sizes["legend"])
+        ax.set_xticklabels(ax.get_xticklabels(), rotation=45, ha='right', fontsize=font_sizes["tick_labels"])
+        ax.set_yticklabels(ax.get_yticklabels(), fontsize=font_sizes["tick_labels"])
         
         # Adjust the figure for the colorbar
         self.current_plot_fig.tight_layout()
@@ -801,7 +801,7 @@ class PlotController:
         
         sns.heatmap(corr_matrix, mask=mask, ax=ax, cmap=cmap, vmin=-1, vmax=1,
                    annot=True, fmt=".2f", square=True, linewidths=.5, cbar_kws={"shrink": .8},
-                   annot_kws={"fontsize": 12})
+                   annot_kws={"fontsize": font_sizes["annotations"]})
         
         # Add title and subtitle
         fig_title = custom_title if custom_title else self._translate("Metric Correlation Matrix")
@@ -813,8 +813,8 @@ class PlotController:
                     fontsize=font_sizes["subtitle"], transform=ax.transAxes, style='italic')
         
         # Format axis ticks - we need special handling for heatmaps
-        ax.set_xticklabels(ax.get_xticklabels(), rotation=45, ha='right', fontsize=font_sizes["legend"])
-        ax.set_yticklabels(ax.get_yticklabels(), rotation=0, fontsize=font_sizes["legend"])
+        ax.set_xticklabels(ax.get_xticklabels(), rotation=45, ha='right', fontsize=font_sizes["tick_labels"])
+        ax.set_yticklabels(ax.get_yticklabels(), rotation=0, fontsize=font_sizes["tick_labels"])
         
         # Adjust layout for the colorbar
         self.current_plot_fig.tight_layout()
@@ -924,11 +924,11 @@ class PlotController:
         
         # Customize the chart
         ax.set_xticks(theta)
-        ax.set_xticklabels(display_metric_names, fontsize=font_sizes["legend"])
+        ax.set_xticklabels(display_metric_names, fontsize=font_sizes["tick_labels"])
         
         # Set y-ticks (circles)
         ax.set_yticks([0.2, 0.4, 0.6, 0.8, 1.0])
-        ax.set_yticklabels(['0.2', '0.4', '0.6', '0.8', '1.0'], color='gray', fontsize=10)
+        ax.set_yticklabels(['0.2', '0.4', '0.6', '0.8', '1.0'], color='gray', fontsize=font_sizes["tick_labels"])
         ax.set_rlim(0, 1)
         
         # Add subtle grid
@@ -1014,7 +1014,7 @@ class PlotController:
         ax.set_ylabel(y_label, fontsize=font_sizes["axis_title"])
         ax.set_xlabel(self._translate("Models"), fontsize=font_sizes["axis_title"])
         ax.set_xticks(np.arange(1, len(valid_exp_names) + 1))
-        ax.set_xticklabels(valid_exp_names, fontsize=font_sizes["legend"])
+        ax.set_xticklabels(valid_exp_names, fontsize=font_sizes["tick_labels"])
         
         # Add legend for mean and median
         mean_line = plt.Line2D([0], [0], color='black', linestyle='-', linewidth=2, label=self._translate('Mean'))
@@ -1094,7 +1094,7 @@ class PlotController:
         y_label = custom_y_label if custom_y_label else display_metric
         ax.set_ylabel(y_label, fontsize=font_sizes["axis_title"])
         ax.set_xticks(x_pos)
-        ax.set_xticklabels(display_exp_names, rotation=45, ha='right', fontsize=font_sizes["legend"])
+        ax.set_xticklabels(display_exp_names, rotation=45, ha='right', fontsize=font_sizes["tick_labels"])
         
         # Add text labels on bars
         for i, bar in enumerate(bars):
@@ -1170,24 +1170,34 @@ class PlotController:
             self.current_plot_fig, ax, 
             custom_title, custom_subtitle, 
             f"{self._translate('Statistical Significance')}: {display_metric}",
-            show_titles
+            show_titles, font_sizes
         )
-        
-        # Add legend for significance levels
-        legend_text = f"{self._translate('Significance levels')}: * {self._translate('p < 0.05')}, ** {self._translate('p < 0.01')}, *** {self._translate('p < 0.001')}, ns: {self._translate('not significant')}"
-        ax.text(0.5, -0.25, legend_text, ha='center', va='center', 
-               transform=ax.transAxes, fontsize=font_sizes["annotations"], style='italic',
-               bbox=dict(boxstyle="round,pad=0.5", facecolor="lightgray", alpha=0.8))
         
         # Apply custom y-axis range if requested
         apply_y_axis_range(ax, custom_y_range, y_min, y_max)
         
-        # Format axis ticks
-        format_axis_ticks(ax)
-        ax.tick_params(axis='y', which='major', labelsize=font_sizes["tick_labels"])
+        # Format axis ticks and apply font sizes
+        format_axis_ticks(ax, font_sizes)
+        apply_font_sizes_to_axis(ax, font_sizes)
         
-        # Adjust layout
+        # Adjust layout first to get proper spacing
         self.current_plot_fig.tight_layout()
+        
+        # Add legend for significance levels after layout adjustment
+        # Position it lower to avoid overlap with rotated labels
+        legend_text = f"{self._translate('Significance levels')}: * {self._translate('p < 0.05')}, ** {self._translate('p < 0.01')}, *** {self._translate('p < 0.001')}, ns: {self._translate('not significant')}"
+        
+        # Calculate appropriate position based on figure size and font size
+        # Use figure coordinates instead of axes coordinates for better control
+        legend_y_pos = 0.02  # Small margin from bottom of figure
+        
+        self.current_plot_fig.text(0.5, legend_y_pos, legend_text, ha='center', va='bottom', 
+                                  fontsize=font_sizes["annotations"], style='italic',
+                                  bbox=dict(boxstyle="round,pad=0.5", facecolor="lightgray", alpha=0.8),
+                                  transform=self.current_plot_fig.transFigure)
+        
+        # Adjust subplot to make room for the legend
+        self.current_plot_fig.subplots_adjust(bottom=0.25)
         
         return True
     

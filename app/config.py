@@ -46,53 +46,53 @@ COLORBAR_PLOTS = [
 
 # Default font sizes - radically increased for better visibility
 DEFAULT_FONT_SIZES = {
-    "title": 28,
-    "subtitle": 22,
-    "axis_title": 20,
-    "axis_labels": 18,
-    "legend": 16,
-    "tick_labels": 16,
-    "annotations": 14
+    "title": 32,
+    "subtitle": 24,
+    "axis_title": 22,
+    "axis_labels": 20,
+    "legend": 18,
+    "tick_labels": 20,  # Increased for better readability of axis labels
+    "annotations": 16
 }
 
 # Font size presets for easy selection
 FONT_SIZE_PRESETS = {
     "Small": {
-        "title": 16,
-        "subtitle": 14,
-        "axis_title": 12,
-        "axis_labels": 10,
-        "legend": 10,
-        "tick_labels": 10,
-        "annotations": 8
+        "title": 18,
+        "subtitle": 15,
+        "axis_title": 13,
+        "axis_labels": 11,
+        "legend": 11,
+        "tick_labels": 12,  # Increased for better readability
+        "annotations": 9
     },
     "Medium": {
-        "title": 20,
-        "subtitle": 16,
-        "axis_title": 14,
-        "axis_labels": 12,
-        "legend": 12,
-        "tick_labels": 12,
-        "annotations": 10
+        "title": 24,
+        "subtitle": 18,
+        "axis_title": 16,
+        "axis_labels": 14,
+        "legend": 14,
+        "tick_labels": 16,  # Increased for better readability
+        "annotations": 12
     },
     "Large": DEFAULT_FONT_SIZES,
     "Extra Large": {
-        "title": 32,
-        "subtitle": 26,
-        "axis_title": 24,
-        "axis_labels": 22,
-        "legend": 20,
-        "tick_labels": 20,
-        "annotations": 18
+        "title": 36,
+        "subtitle": 28,
+        "axis_title": 26,
+        "axis_labels": 24,
+        "legend": 22,
+        "tick_labels": 24,  # Increased for better readability
+        "annotations": 20
     },
     "Presentation": {
-        "title": 40,
-        "subtitle": 32,
-        "axis_title": 28,
-        "axis_labels": 26,
-        "legend": 24,
-        "tick_labels": 24,
-        "annotations": 22
+        "title": 44,
+        "subtitle": 36,
+        "axis_title": 32,
+        "axis_labels": 30,
+        "legend": 28,
+        "tick_labels": 30,  # Increased for better readability
+        "annotations": 26
     }
 }
 
